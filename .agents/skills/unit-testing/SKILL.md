@@ -1,9 +1,9 @@
 ---
 name: unit-testing
-description: Use this skill when writing, mocking, debugging, or running unit and integration tests for frontend React components/hooks and backend Express routes/controllers.
+description: Use this skill when writing, mocking, debugging, or running unit and integration tests for frontend React components/hooks and backend Express routes/controllers in nexusops-admin.
 ---
 
-# Unit & Integration Testing Protocol for Lumina E-Commerce
+# Unit & Integration Testing Protocol for nexusops-admin (NexaOps Admin)
 
 This skill defines the official testing framework, test directory structures, mocking strategies, and execution commands for both the **frontend** (React 19, Vite) and **backend** (Node.js ES Modules, Express, Mongoose).
 

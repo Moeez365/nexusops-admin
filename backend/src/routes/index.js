@@ -4,15 +4,12 @@ import productsRouter from "./products.js";
 import collectionsRouter from "./collections.js";
 import ordersRouter from "./orders.js";
 import settingsRouter from "./settings.js";
-import { checkCountry } from "../middleware/checkCountry.js";
 
 const router = express.Router();
 
-router.get("/", checkCountry, (req, res) => {
+router.get("/", (req, res) => {
   res.send({
     message: "API is ready",
-    detectedCountry: req.country,
-    clientIp: req.clientIp,
   });
 });
 

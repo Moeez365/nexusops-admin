@@ -1,8 +1,8 @@
-# Lumina E-Commerce Frontend - AGENTS.md
+# nexusops-admin (NexaOps Admin) Frontend - AGENTS.md
 
 ## Project Overview
 
-**Lumina** is a luxury commerce admin dashboard built with React + Vite. It provides a sophisticated interface for managing products, collections, inventory, orders, and media assets with a refined, editorial design system.
+**nexusops-admin** (NexaOps Admin) is a commerce admin dashboard built with React + Vite. It provides a sophisticated interface for managing products, collections, inventory, orders, and media assets with a refined, editorial design system.
 
 ### Tech Stack
 - **Framework**: React 19.2.7 with React Router 7.18.1

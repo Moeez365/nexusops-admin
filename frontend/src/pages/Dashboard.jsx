@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import PageHeader from "../components/PageHeader";
 import { StatusBadge } from "../components/common";
-import { getStoreAnalytics } from "../api/settings";
-import { getOrders } from "../api/orders";
+import { useDashboard } from "../hooks";
 
 const cardClass =
   "rounded-2xl border border-outline-variant/60 bg-surface-container/70 p-6 shadow-[0_16px_45px_rgba(50,35,75,0.08)] backdrop-blur-xl transition-all";
@@ -734,64 +733,14 @@ function CustomerOverviewCard() {
 
 // ── Main Dashboard Page (Default / Index Route) ──────────────────────────────
 function Dashboard() {
-  const [activeRange, setActiveRange] = useState("7 days");
   const [notificationToast, setNotificationToast] = useState(null);
-  const [analytics, setAnalytics] = useState(null);
-  const [recentOrders, setRecentOrders] = useState([]);
-  const [ordersLoading, setOrdersLoading] = useState(true);
-
-  useEffect(() => {
-    let ignore = false;
-    const fetchDashboardData = async () => {
-      try {
-        const [analyticsRes, ordersRes] = await Promise.allSettled([
-          getStoreAnalytics({ range: activeRange }),
-          getOrders({ sortBy: "newest" }),
-        ]);
-
-        if (!ignore) {
-          if (analyticsRes.status === "fulfilled" && analyticsRes.value?.data) {
-            setAnalytics(analyticsRes.value.data);
-          }
-
-          if (ordersRes.status === "fulfilled" && Array.isArray(ordersRes.value?.data)) {
-            const mapped = ordersRes.value.data.slice(0, 6).map((o) => ({
-              id: o.orderNumber || (o._id ? `#${String(o._id).slice(-5).toUpperCase()}` : "#10001"),
-              rawId: o._id || o.id,
-              customer: o.customer || (o.customerName || "Customer"),
-              product:
-                o.product ||
-                (o.items?.[0]?.name
-                  ? `${o.items[0].name}${o.items.length > 1 ? ` (+${o.items.length - 1} more)` : ""}`
-                  : "Store Item"),
-              date: o.createdAt
-                ? new Date(o.createdAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                : "Recent",
-              amount:
-                typeof o.total === "number"
-                  ? `$${o.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                  : (o.total || "$0.00"),
-              status: o.status || "Pending",
-            }));
-            setRecentOrders(mapped);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load dashboard data:", err);
-      } finally {
-        if (!ignore) setOrdersLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-    return () => {
-      ignore = true;
-    };
-  }, [activeRange]);
+  const {
+    activeRange,
+    setActiveRange,
+    analytics,
+    recentOrders,
+    isLoading: ordersLoading,
+  } = useDashboard("7 days");
 
   return (
     <>

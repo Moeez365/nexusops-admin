@@ -1,11 +1,11 @@
 ---
 name: code-review
-description: Use this skill to audit code diffs, pull requests, or proposed modifications for correctness, edge cases, React 19 / Node.js ES Modules best practices, and security vulnerabilities across the Lumina e-commerce frontend and backend.
+description: Use this skill to audit code diffs, pull requests, or proposed modifications for correctness, edge cases, React 19 / Node.js ES Modules best practices, and security vulnerabilities across the nexusops-admin frontend and backend.
 ---
 
-# Code Review Protocol for Lumina E-Commerce
+# Code Review Protocol for nexusops-admin (NexaOps Admin)
 
-This skill provides an automated, rigorous protocol to audit code changes across the **Lumina** luxury e-commerce platform. It ensures adherence to the repository's architectural standards, design token integrity, security controls, and high-performance React 19 / Express ES Modules conventions.
+This skill provides an automated, rigorous protocol to audit code changes across the **nexusops-admin** (NexaOps Admin) commerce platform. It ensures adherence to the repository's architectural standards, design token integrity, security controls, and high-performance React 19 / Express ES Modules conventions.
 
 ---
 
@@ -16,7 +16,7 @@ When auditing code, verify compliance against the detected stack:
 - **Frontend**:
   - React 19 (`react: ^19.2.7`, `react-dom: ^19.2.7`) with Functional Components and React Hooks.
   - React Router DOM v7 (`react-router-dom: ^7.18.1`).
-  - Tailwind CSS v4 (`@tailwindcss/vite: ^4.3.3`) with Lumina Design Tokens (`tailwind.config.js`).
+  - Tailwind CSS v4 (`@tailwindcss/vite: ^4.3.3`) with NexaOps Design Tokens (`tailwind.config.js`).
   - Linting: Oxlint (`oxlint: ^1.71.0`) with 0 errors and 0 warnings requirement.
   - UI Icons: Google Material Symbols Outlined (with `.icons-loaded` CSS fallback).
   - API Client: Axios (`frontend/src/api/axios.js`) configured with base `/api`.
@@ -31,7 +31,7 @@ When auditing code, verify compliance against the detected stack:
 
 ## 2. Review Checklist
 
-### A. Frontend Verification (React 19 & Lumina UI)
+### A. Frontend Verification (React 19 & NexaOps UI)
 
 1. **React 19 & Hook Rules**:
    - [ ] No hook calls inside conditionals, loops, or nested functions.
@@ -49,7 +49,7 @@ When auditing code, verify compliance against the detected stack:
      cd frontend && npx oxlint src
      ```
 
-3. **Lumina Design System & Token Integrity**:
+3. **NexaOps Design System & Token Integrity**:
    - [ ] Adheres to tokens in `DESIGN_SYSTEM.md` and `tailwind.config.js`.
    - [ ] **No arbitrary hardcoded colors** (e.g. avoid `#6d3bd7`, `rgb(...)` in inline classes; use `bg-primary`, `text-on-surface`, `bg-surface-container/70`).
    - [ ] Cards implement standard elevation:

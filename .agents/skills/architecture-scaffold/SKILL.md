@@ -1,9 +1,9 @@
 ---
 name: architecture-scaffold
-description: Use this skill to scaffold new full-stack features, Mongoose models, Express routes/controllers, React components, and dashboard pages matching the established Lumina e-commerce patterns.
+description: Use this skill to scaffold new full-stack features, Mongoose models, Express routes/controllers, React components, and dashboard pages matching the established nexusops-admin patterns.
 ---
 
-# Architecture Scaffolding Protocol for Lumina E-Commerce
+# Architecture Scaffolding Protocol for nexusops-admin (NexaOps Admin)
 
 This skill provides step-by-step blueprints and boilerplate templates to scaffold new features, database entities, REST endpoints, and UI views. Every scaffolded module strictly adheres to the established architectural conventions of this repository.
 
@@ -175,7 +175,7 @@ export const createEntity = async (payload) => {
 ```
 
 ### B. UI Component (`frontend/src/components/[domain]/[Component].jsx`)
-Always follow Lumina glassmorphism and PropTypes:
+Always follow NexaOps glassmorphism and PropTypes:
 
 ```jsx
 import PropTypes from 'prop-types';

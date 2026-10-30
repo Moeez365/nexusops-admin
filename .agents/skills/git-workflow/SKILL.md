@@ -1,11 +1,11 @@
 ---
 name: git-workflow
-description: Use this skill to craft standardized conventional commit messages, branch naming strategies, and pull request descriptions tailored to the Lumina e-commerce repository.
+description: Use this skill to craft standardized conventional commit messages, branch naming strategies, and pull request descriptions tailored to the nexusops-admin repository.
 ---
 
-# Git Workflow & Conventional Commits Protocol
+# Git Workflow & Conventional Commits Protocol for nexusops-admin
 
-This skill enforces consistent git version control practices across the **Lumina E-Commerce** repository. It standardizes branch names, commit formats, pre-commit quality gates, and Pull Request (PR) templates.
+This skill enforces consistent git version control practices across the **nexusops-admin** (NexaOps Admin) repository. It standardizes branch names, commit formats, pre-commit quality gates, and Pull Request (PR) templates.
 
 ---
 
@@ -85,7 +85,7 @@ git status --short
 
 ## 4. Pull Request (PR) Template
 
-When preparing a Pull Request, use the standard Lumina PR template:
+When preparing a Pull Request, use the standard nexusops-admin PR template:
 
 ```markdown
 ## Summary
@@ -96,7 +96,7 @@ When preparing a Pull Request, use the standard Lumina PR template:
 
 ## Key Changes
 ### Frontend
-- Added `[Component/Page]` implementing Lumina design tokens.
+- Added `[Component/Page]` implementing NexaOps design tokens.
 - Connected `[API function]` to fetch live data instead of mock constants.
 
 ### Backend

@@ -1,15 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import PageHeader from "../components/PageHeader";
 import ListFilterToolbar, {
   ToolbarSelect,
 } from "../components/ListFilterToolbar";
 import {
-  ORDER_SUMMARY_CARDS,
   ORDER_STATUS_FILTERS,
 } from "../constants/orders";
-import { getOrders, getOrderStats, updateOrderStatus } from "../api/orders";
-import { getStoreSettings } from "../api/settings";
-import { formatCurrency, formatDate } from "../utils";
+import { useOrders } from "../hooks";
 
 const ORDER_STATUS_CHOICES = [
   "Pending",
@@ -235,126 +232,30 @@ function OrderDrawer({ order, onClose, onStatusChange, updatingOrderId }) {
 
 // ── Main Orders Page ─────────────────────────────────────────────────────────
 function Orders() {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [summaryCards, setSummaryCards] = useState(ORDER_SUMMARY_CARDS);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusTab, setStatusTab] = useState("All");
-  const [sortBy, setSortBy] = useState("newest");
-  const [updatingOrderId, setUpdatingOrderId] = useState(null);
-  const [notification, setNotification] = useState(null);
-  const [drawerOrder, setDrawerOrder] = useState(null);
-
-  useEffect(() => {
-    let ignore = false;
-    async function loadOrdersData() {
-      try {
-        setLoading(true);
-        const [ordersRes, statsRes, settingsRes] = await Promise.all([
-          getOrders().catch(() => ({ data: [] })),
-          getOrderStats().catch(() => ({ data: null })),
-          getStoreSettings().catch(() => ({ data: null })),
-        ]);
-        if (!ignore) {
-          const defaultCurr = settingsRes?.data?.commerce?.defaultCurrency || "USD";
-
-          if (Array.isArray(ordersRes?.data)) {
-            const mappedOrders = ordersRes.data.map((o) => ({
-              id: o.orderNumber || o.id || o._id,
-              rawId: o._id || o.id,
-              customer: o.customer || "Guest Client",
-              email: o.email || "No email",
-              product:
-                o.product ||
-                (o.items?.[0]?.name
-                  ? `${o.items[0].name}${o.items.length > 1 ? ` (+${o.items.length - 1} more)` : ""}`
-                  : "Bespoke Order"),
-              date: formatDate(o.createdAt),
-              rawDate: o.createdAt,
-              status: o.status || "Pending",
-              total:
-                typeof o.total === "number"
-                  ? formatCurrency(o.total, o.currency || defaultCurr)
-                  : o.total,
-              numericTotal: typeof o.total === "number" ? o.total : 0,
-            }));
-            setOrders(mappedOrders);
-          }
-          if (statsRes?.data?.summaryCards) {
-            setSummaryCards(statsRes.data.summaryCards);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load orders from API:", err);
-      } finally {
-        if (!ignore) setLoading(false);
-      }
-    }
-    loadOrdersData();
-    return () => { ignore = true; };
-  }, []);
-
-  const handleStatusChange = async (order, newStatus) => {
-    if (!order || order.status === newStatus) return;
-
-    const previousStatus = order.status;
-    const orderKey = order.id;
-
-    // Optimistic update
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderKey ? { ...o, status: newStatus } : o)),
-    );
-    // Keep drawer order in sync
-    setDrawerOrder((prev) =>
-      prev?.id === orderKey ? { ...prev, status: newStatus } : prev,
-    );
-    setUpdatingOrderId(orderKey);
-    setNotification(null);
-
-    try {
-      const targetId = order.rawId || order.id;
-      await updateOrderStatus(targetId, newStatus);
-      setNotification({
-        type: "success",
-        message: `Order ${order.id} status changed to ${newStatus}`,
-      });
-      getOrderStats()
-        .then((statsRes) => {
-          if (statsRes?.data?.summaryCards) setSummaryCards(statsRes.data.summaryCards);
-        })
-        .catch(() => {});
-    } catch (err) {
-      console.error("Failed to update order status:", err);
-      // Rollback
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderKey ? { ...o, status: previousStatus } : o)),
-      );
-      setDrawerOrder((prev) =>
-        prev?.id === orderKey ? { ...prev, status: previousStatus } : prev,
-      );
-      setNotification({
-        type: "error",
-        message:
-          err?.response?.data?.message ||
-          `Failed to update status for order ${order.id}`,
-      });
-    } finally {
-      setUpdatingOrderId(null);
-    }
-  };
-
-  const tabCounts = useMemo(() => {
-    const counts = { All: orders.length };
-    ORDER_STATUS_FILTERS.forEach((st) => {
-      if (st === "All") return;
-      counts[st] = orders.filter((o) => o.status === st).length;
-    });
-    return counts;
-  }, [orders]);
+  const {
+    orders: filteredOrders,
+    rawOrdersCount,
+    isLoading: loading,
+    summaryCards,
+    searchQuery,
+    setSearchQuery,
+    statusTab,
+    setStatusTab,
+    sortBy,
+    setSortBy,
+    tabCounts,
+    updatingOrderId,
+    notification,
+    setNotification,
+    drawerOrder,
+    setDrawerOrder,
+    updateOrderStatus: handleStatusChange,
+    handleResetFilters,
+  } = useOrders();
 
   const orderTabs = useMemo(
     () => ORDER_STATUS_FILTERS.map((st) => ({ id: st, label: st, count: tabCounts[st] ?? 0 })),
-    [tabCounts],
+    [tabCounts]
   );
 
   const statusOptions = [
@@ -376,35 +277,6 @@ function Orders() {
 
   const hasActiveFilters =
     statusTab !== "All" || Boolean(searchQuery.trim()) || sortBy !== "newest";
-
-  const handleResetFilters = () => {
-    setStatusTab("All");
-    setSearchQuery("");
-    setSortBy("newest");
-  };
-
-  const filteredOrders = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    const list = orders.filter((order) => {
-      const matchesStatus = statusTab === "All" || order.status === statusTab;
-      const matchesSearch =
-        !query ||
-        order.id.toLowerCase().includes(query) ||
-        order.customer.toLowerCase().includes(query) ||
-        order.email.toLowerCase().includes(query) ||
-        order.product.toLowerCase().includes(query);
-      return matchesStatus && matchesSearch;
-    });
-    return [...list].sort((a, b) => {
-      const numA = typeof a.numericTotal === "number" ? a.numericTotal : (parseFloat(String(a.total).replace(/[^0-9.-]+/g, "")) || 0);
-      const numB = typeof b.numericTotal === "number" ? b.numericTotal : (parseFloat(String(b.total).replace(/[^0-9.-]+/g, "")) || 0);
-      if (sortBy === "total_desc") return numB - numA;
-      if (sortBy === "total_asc") return numA - numB;
-      if (sortBy === "customer_asc") return a.customer.localeCompare(b.customer);
-      if (sortBy === "oldest") return a.id.localeCompare(b.id);
-      return b.id.localeCompare(a.id);
-    });
-  }, [orders, searchQuery, statusTab, sortBy]);
 
   return (
     <>
@@ -472,7 +344,7 @@ function Orders() {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             totalFilteredCount={filteredOrders.length}
-            totalCount={orders.length}
+            totalCount={rawOrdersCount}
             hasActiveFilters={hasActiveFilters}
             onResetFilters={handleResetFilters}
           >

@@ -19,7 +19,7 @@ import {
 import { formatCurrency } from "../utils";
 
 function Inventory() {
-  const [data, setData] = useState([]);
+  const [products, setProducts] = useState([]);
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -86,7 +86,7 @@ function Inventory() {
         });
 
         if (!ignore) {
-          setData(productsRes.data || []);
+          setProducts(productsRes.data || []);
           if (productsRes.tabCounts) {
             setTabCounts(productsRes.tabCounts);
           }
@@ -172,7 +172,7 @@ function Inventory() {
 
   const categoryOptions = useMemo(() => {
     const set = new Set(categoriesList);
-    data.forEach((p) => {
+    products.forEach((p) => {
       if (p.category && p.category.trim()) {
         set.add(p.category.trim());
       }
@@ -183,7 +183,7 @@ function Inventory() {
         .sort()
         .map((cat) => ({ value: cat, label: cat })),
     ];
-  }, [categoriesList, data]);
+  }, [categoriesList, products]);
 
   const collectionOptions = useMemo(() => {
     return [
@@ -217,7 +217,7 @@ function Inventory() {
   };
 
   // Products are already filtered and sorted by backend
-  const filteredProducts = data;
+  const filteredProducts = products;
 
   const handleProductClick = (id) => {
     navigate(`/inventory/add-product?id=${encodeURIComponent(id)}`);
@@ -276,7 +276,7 @@ function Inventory() {
 
       const res = await createProduct(payload);
       if (res?.data) {
-        setData((prev) => [res.data, ...prev]);
+        setProducts((prev) => [res.data, ...prev]);
         setTabCounts((prev) => ({
           ...prev,
           all: prev.all + 1,
@@ -337,7 +337,7 @@ function Inventory() {
             searchPlaceholder="Search by product name, category, or brand..."
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            totalFilteredCount={data.length}
+            totalFilteredCount={products.length}
             totalCount={tabCounts.all}
             hasActiveFilters={hasActiveFilters}
             onResetFilters={handleResetFilters}
@@ -587,7 +587,7 @@ function Inventory() {
 
           <div className="mt-8 flex flex-col items-center gap-4">
             <p className="text-[10px] font-label-mono uppercase tracking-widest text-on-surface-variant/60">
-              Showing {filteredProducts.length} of {data.length} Products
+              Showing {filteredProducts.length} of {products.length} Products
             </p>
             <div className="relative h-1 w-64 overflow-hidden rounded-full bg-primary/5">
               <div className="absolute inset-y-0 left-0 w-1/4 bg-primary shadow-[0_0_10px_rgba(109,59,215,0.5)]" />

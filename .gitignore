@@ -83,5 +83,8 @@ Thumbs.db
 !.vscode/extensions.json
 
 # ── Local Agent Workspaces & Temporary AI Caches ─────────────────────────────
-.agents/
+.agents/*
+!.agents/skills/
+!.agents/rules/
 .gemini/
+
