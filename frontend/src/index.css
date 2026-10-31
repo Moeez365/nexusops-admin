@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @config '../tailwind.config.js';
 @import 'tailwindcss';
 
@@ -47,7 +47,13 @@ div:has(> .media-image-loading)::after {
 }
 
 :root {
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Primary UI: Body, navigation, cards, form inputs */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  
+  /* Data UI: Metrics, IDs, timestamps, SKU tables */
+  --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
+
+  font-family: var(--font-sans);
   line-height: 1.5;
   font-weight: 400;
   color: #1d1a20;
@@ -59,11 +65,17 @@ div:has(> .media-image-loading)::after {
 }
 
 body {
+  font-family: var(--font-sans);
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
   background-color: #fbf9ff;
   color: #1d1a20;
+}
+
+/* Enforce aligned numbers inside data tables */
+table, .metric-value, .tabular-data {
+  font-feature-settings: "tnum" 1, "zero" 1;
 }
 
 #root {
@@ -89,6 +101,14 @@ select {
 * {
   scrollbar-color: #b8a5df #efecf4;
   scrollbar-width: thin;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 @layer components {

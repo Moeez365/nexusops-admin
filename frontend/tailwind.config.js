@@ -65,11 +65,13 @@ export default {
         gutter: '20px',
       },
       fontFamily: {
-        'display-lg': ['Inter', 'sans-serif'],
-        'label-mono': ['"JetBrains Mono"', 'monospace'],
-        'headline-lg': ['Inter', 'sans-serif'],
-        'title-md': ['Inter', 'sans-serif'],
-        'body-base': ['Inter', 'sans-serif'],
+        sans: ['var(--font-sans)', 'sans-serif'],
+        mono: ['var(--font-mono)', 'monospace'],
+        'display-lg': ['var(--font-sans)', 'sans-serif'],
+        'label-mono': ['var(--font-mono)', 'monospace'],
+        'headline-lg': ['var(--font-sans)', 'sans-serif'],
+        'title-md': ['var(--font-sans)', 'sans-serif'],
+        'body-base': ['var(--font-sans)', 'sans-serif'],
       },
       fontSize: {
         'display-lg': ['48px', { lineHeight: '1.1', letterSpacing: '-0.04em', fontWeight: '600' }],

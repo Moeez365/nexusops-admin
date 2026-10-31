@@ -58,6 +58,7 @@ nexusops-admin/
 │   │   │   ├── imageController.js
 │   │   │   └── settingsController.js
 │   │   ├── models/                   # Mongoose Data Schemas
+│   │   │   ├── userModel.js
 │   │   │   ├── orderModel.js
 │   │   │   ├── productModel.js
 │   │   │   ├── collectionModel.js

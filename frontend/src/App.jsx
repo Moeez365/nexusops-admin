@@ -56,7 +56,12 @@ function App() {
     };
   }, []);
 
-  const renderNavLink = (item, animationIndex, isCollapsed = false) => {
+  const renderNavLink = (
+    item,
+    animationIndex = undefined,
+    isCollapsed = false,
+    onNavigate = undefined,
+  ) => {
     if (isCollapsed) {
       return (
         <NavLink
@@ -64,6 +69,7 @@ function App() {
           to={item.to}
           end={item.to === "/"}
           title={item.label}
+          onClick={onNavigate}
           className={({ isActive }) =>
             `group relative flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-200 hover:bg-primary/10 hover:text-primary ${
               isActive
@@ -87,6 +93,7 @@ function App() {
         key={item.label}
         to={item.to}
         end={item.to === "/"}
+        onClick={onNavigate}
         style={
           animationIndex === undefined
             ? undefined
@@ -147,9 +154,9 @@ function App() {
                   {NAV_ITEMS.map((item, index) =>
                     renderNavLink(
                       item,
-                      () => setIsMobileNavOpen(false),
                       index,
                       false,
+                      () => setIsMobileNavOpen(false),
                     ),
                   )}
                 </nav>
@@ -242,8 +249,10 @@ function App() {
             )}
 
             <nav
-              className={`flex-1 space-y-1.5 overflow-y-auto ${
-                isDesktopCollapsed ? "flex w-full flex-col items-center" : "w-full"
+              className={`flex-1 space-y-1.5 ${
+                isDesktopCollapsed
+                  ? "flex w-full flex-col items-center overflow-visible"
+                  : "w-full overflow-y-auto no-scrollbar"
               }`}
             >
               {NAV_ITEMS.map((item) =>

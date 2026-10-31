@@ -6,6 +6,7 @@ import ListFilterToolbar, {
   ToolbarSelect,
 } from "../components/ListFilterToolbar";
 import { ConfirmModal, StatusBadge } from "../components/common";
+import { useImageLoader } from "../hooks";
 
 function Collection() {
   const navigate = useNavigate();
@@ -22,16 +23,11 @@ function Collection() {
     has_products: 0,
     empty: 0,
   });
-  const [loadedImages, setLoadedImages] = useState([]);
+  const { markImageLoaded, isImageLoaded } = useImageLoader();
   const [failedCoverImages, setFailedCoverImages] = useState(() => new Set());
   const [collectionToDelete, setCollectionToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-
-  const markImageLoaded = (key) => {
-    if (!key) return;
-    setLoadedImages((prev) => (prev.includes(key) ? prev : [...prev, key]));
-  };
 
   // Debounce search query input by 300ms
   useEffect(() => {
@@ -276,7 +272,7 @@ function Collection() {
                             })
                           }
                           className={`h-full w-full object-cover ${
-                            loadedImages.includes(collectionId)
+                            isImageLoaded(collectionId)
                               ? "opacity-100 transition-transform duration-700 group-hover:scale-110 motion-reduce:transition-none"
                               : "media-image-loading opacity-0"
                           }`}
