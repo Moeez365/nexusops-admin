@@ -144,7 +144,7 @@ The visual design is grounded in an editorial luxury aesthetic:
 
 #### 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/nexusops-admin.git
+git clone (https://github.com/Moeez365/nexusops-admin)
 cd nexusops-admin
 ```
 
