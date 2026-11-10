@@ -4,6 +4,7 @@ import productsRouter from "./products.js";
 import collectionsRouter from "./collections.js";
 import ordersRouter from "./orders.js";
 import settingsRouter from "./settings.js";
+import usersRouter from "./users.js";
 
 const router = express.Router();
 
@@ -18,5 +19,6 @@ router.use("/products", productsRouter);
 router.use("/collections", collectionsRouter);
 router.use("/orders", ordersRouter);
 router.use("/settings", settingsRouter);
+router.use("/users", usersRouter);
 
 export default router;

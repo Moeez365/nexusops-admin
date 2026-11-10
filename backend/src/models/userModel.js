@@ -40,15 +40,14 @@ const addressSchema = new mongoose.Schema(
 );
 
 /**
- * User Roles & Customer Tiers Constants
+ * Customer Tiers Constants
  */
-export const USER_ROLES = Object.freeze(["admin", "manager", "staff", "customer"]);
 export const CUSTOMER_TIERS = Object.freeze(["VIP", "Active", "New"]);
 
 /**
- * User Schema
+ * User / Customer Schema
  *
- * Designed to handle both administrative staff and luxury storefront patrons.
+ * Exclusively represents storefront shopping clients and luxury patrons.
  * Includes security protection (password excluded by default on queries),
  * e-commerce telemetry (total spent, orders count, tiers), and address profiles.
  */
@@ -78,15 +77,6 @@ const userSchema = new mongoose.Schema(
       required: [true, "Password is required"],
       minlength: [6, "Password must be at least 6 characters"],
       select: false, // Hidden by default from queries for security
-    },
-    role: {
-      type: String,
-      enum: {
-        values: USER_ROLES,
-        message: "{VALUE} is not a valid user role",
-      },
-      default: "customer",
-      index: true,
     },
     avatar: {
       type: String,

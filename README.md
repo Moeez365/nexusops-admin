@@ -46,12 +46,14 @@ nexusops-admin/
 │   │   │   ├── errorHandler.js       # Centralized 404 & Mongoose error handling
 │   │   │   └── upload.js             # Multer upload limits and storage engine
 │   │   ├── services/                 # Dedicated Business Logic & Query Layer
+│   │   │   ├── userService.js        # User directory, tier metrics & customer queries
 │   │   │   ├── orderService.js       # Orders queries, aggregations & stats
 │   │   │   ├── productService.js     # Catalog queries, stock & collections sync
 │   │   │   ├── collectionService.js  # Collections hierarchy & population
 │   │   │   ├── imageService.js       # Cloudinary pipeline & unlink cleanup
 │   │   │   └── settingsService.js    # Store settings, analytics & payment sanitization
 │   │   ├── controllers/              # Thin Controllers (HTTP parsing & envelopes only)
+│   │   │   ├── userController.js
 │   │   │   ├── orderController.js
 │   │   │   ├── productController.js
 │   │   │   ├── collectionController.js

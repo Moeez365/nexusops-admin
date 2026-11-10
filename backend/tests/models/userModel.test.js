@@ -1,13 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import User, { USER_ROLES, CUSTOMER_TIERS } from "../../src/models/userModel.js";
-
-test("USER_ROLES contains administrative and customer roles", () => {
-  assert.ok(USER_ROLES.includes("admin"));
-  assert.ok(USER_ROLES.includes("manager"));
-  assert.ok(USER_ROLES.includes("staff"));
-  assert.ok(USER_ROLES.includes("customer"));
-});
+import User, { CUSTOMER_TIERS } from "../../src/models/userModel.js";
 
 test("CUSTOMER_TIERS matches luxury frontend customer tiers", () => {
   assert.ok(CUSTOMER_TIERS.includes("VIP"));
@@ -47,14 +40,13 @@ test("User schema computes 'initials' virtual properly", () => {
   assert.strictEqual(user.initials, "SL");
 });
 
-test("User schema defaults to role 'customer' and tier 'New'", () => {
+test("User schema defaults to tier 'New' with zero initial spend", () => {
   const user = new User({
     name: "Elena Dubois",
     email: "e.dubois@maison.fr",
     password: "securePassword123",
   });
 
-  assert.strictEqual(user.role, "customer");
   assert.strictEqual(user.tier, "New");
   assert.strictEqual(user.isActive, true);
   assert.strictEqual(user.totalSpent, 0);
