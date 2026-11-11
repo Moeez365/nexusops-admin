@@ -1,488 +1,319 @@
-# Lumina Frontend Design System
+# NexaOps Admin — Frontend Design System
 
-Use this file as the visual and structural source of truth when creating or modifying Lumina admin pages.
+Use this file as the single visual, structural, and component source of truth when building or updating pages in `frontend/`.
 
-## Product Direction
+Every color, spacing token, utility class, component pattern, and route in this document maps directly to the live codebase (`tailwind.config.js`, `src/index.css`, `src/App.jsx`, `src/components/`, and `src/pages/`).
 
-Lumina is a refined luxury-commerce admin UI. It should feel calm, editorial, precise, and modern.
+---
 
-The interface is not a marketing website. It is an admin dashboard for repeated daily work, so pages should be clear, scannable, and efficient while still feeling premium.
+## 1. Product Direction & Aesthetic Principles
 
-Good Lumina pages use:
+**NexaOps Admin** is a high-precision luxury e-commerce operations console. It uses a calm lavender-tinted neutral surface hierarchy paired with saturated violet primary actions, frosted glass cards, and crisp monospace metadata.
 
-- Pale lavender page surfaces.
-- Saturated violet primary actions.
-- Soft glass-like cards.
-- Restrained shadows.
-- Generous whitespace.
-- Compact uppercase metadata.
-- Product imagery where it helps the user understand inventory, media, or collections.
-- Clear actions in the sticky header.
+Core visual traits across the app:
+- **Pale lavender canvas**: `#fbf9ff` (`bg-background` / `bg-surface`) with elevated white-violet cards (`bg-surface-container/70 backdrop-blur-xl`).
+- **Saturated violet actions**: `#6d3bd7` (`bg-primary text-on-primary`) for primary CTAs and active states.
+- **Restrained elevation**: Subtle purple-tinted shadows (`shadow-[0_16px_45px_rgba(50,35,75,0.08)]`) and hairline borders (`border-outline-variant/60`).
+- **Editorial hierarchy**: `Inter` for headings and UI copy, `Geist Mono` / `JetBrains Mono` (`font-label-mono`) for eyebrow labels, tabular metrics, IDs, SKUs, and badges.
+- **Scannable efficiency**: Sticky action headers, KPI summary rows, filter toolbars with live tab counts, and asymmetric 12-column create/edit layouts.
 
-Reference pages:
+**Canonical reference implementations in `src/pages/`**:
+- Overview & charts: `Dashboard.jsx`, `Analytics.jsx`
+- Filterable lists & tables: `Inventory.jsx`, `Collection.jsx`, `Orders.jsx`, `Customers.jsx`
+- Create / Edit forms: `AddProduct.jsx`, `AddCollection.jsx`, `CreateOrder.jsx`
+- Media asset workflows: `MediaGallery.jsx`, `UploadImages.jsx`
+- Multi-tab configuration: `Settings.jsx`
 
-- `Dashboard.jsx` for analytics, metrics, alert cards, tables, and charts.
-- `Inventory.jsx` for product grids, search, filters, and product cards.
-- `MediaGallery.jsx` for asset-heavy layouts.
-- `Collection.jsx` for collection management.
-- `PageHeader.jsx` for the standard page header.
+---
 
-## Brand Tokens
+## 2. Design Tokens (`tailwind.config.js` & `src/index.css`)
 
-Use `tailwind.config.js` as the token source. Do not create another color system.
+**Rule:** Strictly use tokens defined in `tailwind.config.js`, custom utilities in `src/index.css`, or standard Tailwind utilities. **Do not invent undefined tokens** (such as `space-lg`, `space-md`, `font-headline-sm`, `font-body-md`, `font-label-sans`, or `text-label-mono-sm`).
 
-Core colors:
+### Color Tokens (`tailwind.config.js`)
 
-- Page background: `bg-background`
-- Main text: `text-on-surface`
-- Secondary text: `text-on-surface-variant`
-- Primary action: `bg-primary text-on-primary`
-- Soft primary surface: `bg-primary-container text-on-primary-container`
-- Standard card surface: `bg-surface-container/70`
-- Input surface: `bg-surface-container-low`
-- Subtle border: `border-outline-variant/60`
-- Destructive action: `bg-error text-on-error`
-- Destructive soft state: `bg-error-container text-on-error-container`
+| Role | Token / Class | Hex Value | Usage |
+| :--- | :--- | :--- | :--- |
+| Canvas / Page Background | `bg-background` / `bg-surface` | `#fbf9ff` | Main `<main>` canvas and modal shell |
+| Lowest Elevated Input/Row | `bg-surface-container-lowest` | `#fffaff` | Modal panels, sidebar drawer, active pills |
+| Input / Subtle Table Header | `bg-surface-container-low` | `#f5f2fa` | Text inputs, `<select>`, `<thead>` rows |
+| Standard Surface / Card | `bg-surface-container` | `#efecf4` | Standard cards (`bg-surface-container/70`), pill tracks |
+| Subtle Interactive Surface | `bg-surface-container-high` | `#e9e6ee` | Secondary pill buttons, hover fills, disabled states |
+| Strong Container Accent | `bg-surface-container-highest` | `#e3e0e8` | Dense badges, count chips, switches |
+| Primary Text | `text-on-surface` | `#1d1a20` | Headings, table values, input text |
+| Secondary Text | `text-on-surface-variant` | `#4b4654` | Labels, descriptions, table subtitles |
+| Muted / Helper Text | `text-outline` | `#7c7485` | Eyebrow slashes, placeholders, timestamps |
+| Hairline Border | `border-outline-variant` | `#cdc4d2` | Card borders (`/60`), input borders (`/40`), dividers (`/30`–`/40`) |
+| Primary Brand Action | `bg-primary` / `text-primary` | `#6d3bd7` | Primary buttons, focus rings, active nav links |
+| Text on Primary | `text-on-primary` | `#fffaff` | Button text/icons on `bg-primary` |
+| Soft Primary Fill | `bg-primary-container` | `#e9ddff` | Icon boxes, active status badges, toast banners |
+| Text on Soft Primary | `text-on-primary-container` | `#23005c` | Text/icons inside `bg-primary-container` |
+| Secondary Accent | `bg-secondary-container` / `text-on-secondary-container` | `#e9ddff` / `#22005d` | Section icon badges, tier pills |
+| Tertiary Accent | `bg-tertiary-fixed` / `text-on-tertiary-fixed` | `#e3dfff` / `#181445` | Alternate tags / lot badges |
+| Destructive / Error | `bg-error` / `text-error` / `bg-error-container` / `text-on-error-container` | `#ba1a1a` / `#ffdad6` / `#410002` | Required asterisks `*`, error banners, delete confirmation |
+| Backdrop Overlay | `bg-inverse-surface/45` (`#322f35`) or `bg-black/30` | `#322f35` | Modal and drawer backdrops |
 
-Typography:
+**Contrast Warning:** Never pair `bg-primary-container` (`#e9ddff`) with `text-on-primary` (`#fffaff`) on buttons or badges—both are light colors. Always pair `bg-primary` with `text-on-primary`, and `bg-primary-container` with `text-primary` or `text-on-primary-container`.
 
-- Main font: Inter.
-- Metadata font: `font-label-mono`.
-- Page title: `font-headline-lg-mobile text-headline-lg-mobile md:font-headline-lg md:text-headline-lg`
-- Section title: `text-xl font-semibold` or `font-title-md text-title-md`
-- Body text: `text-body-base text-on-surface-variant`
-- Metadata text: `font-label-mono text-[10px] uppercase tracking-widest`
+### Typography & Numeric Formatting
 
-Icon system:
+Font imports are loaded in `index.html` and wired in `src/index.css`:
+- **Sans (`--font-sans`)**: `'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
+- **Mono (`--font-mono`)**: `'Geist Mono', 'JetBrains Mono', ui-monospace, monospace`
+- **Tabular figures**: `table`, `.metric-value`, and `.tabular-data` automatically apply `font-feature-settings: "tnum" 1, "zero" 1` (`src/index.css`), or use Tailwind `tabular-nums` on KPI counts and prices.
 
-- Use Google Material Symbols Outlined.
-- Icon-only buttons must have `aria-label`.
-- Good icon names: `dashboard`, `inventory_2`, `shopping_cart`, `cloud_upload`, `collections`, `insights`, `group`, `settings`, `person`, `lock`, `notifications`, `palette`, `storefront`, `payments`, `local_shipping`, `verified_user`.
+Exact font tokens in `tailwind.config.js` and `src/index.css`:
+- `font-display-lg` / `text-display-lg`: `48px`, `line-height: 1.1`, `letter-spacing: -0.04em`, weight `600` (use responsive sizing such as `text-2xl md:text-3xl` inside narrow sidebars)
+- `font-headline-lg` / `text-headline-lg`: `32px`, `line-height: 1.2`, `letter-spacing: -0.02em`, weight `600` (page `<h1>` pattern: `font-headline-lg text-2xl tracking-tight text-on-surface md:text-headline-lg`)
+- `font-headline-md` (`src/index.css`): `1.25rem` (`20px`), `line-height: 1.75rem`, weight `600`
+- `font-title-md` / `text-title-md`: `18px`, `line-height: 1.5`, `letter-spacing: -0.01em`, weight `500` (card headers & button titles: `font-title-md text-title-md font-semibold` or `font-title-md text-sm`)
+- `font-label-md` (`src/index.css`): `0.875rem` (`14px`), `line-height: 1.25rem`, weight `500`
+- `text-body-base`: `14px`, `line-height: 1.6`, weight `400`
+- `font-label-mono` / `text-label-mono`: `12px`, `line-height: 1`, `letter-spacing: 0.05em`, weight `500` (section eyebrows and table headers commonly use `font-label-mono text-[10px] uppercase tracking-widest` or `tracking-[0.2em]`)
+- `text-label-sm` (`src/index.css`): `0.75rem` (`12px`), `line-height: 1rem`
 
-## Standard Page Shell
+### Spacing, Radii, Shadows & Custom Utilities
 
-Every normal admin page should follow this structure:
+- **Radii (`tailwind.config.js`)**: `rounded` (`0.25rem`), `rounded-lg` (`0.5rem`), `rounded-xl` (`0.75rem` for inputs, inner panels, icon boxes), `rounded-2xl` (primary glass cards, tables, modals), `rounded-full` (pills, primary header CTA, status badges).
+- **Spacing**: `gap-gutter` (`20px` / `1.25rem`), `p-container-padding` (`32px`), `px-margin-mobile` (`1rem`), `px-margin-desktop` (`2rem`), `gap-stack-sm` (`0.75rem`), `p-stack-md` (`1.5rem`), `mt-stack-md` (`1.5rem`).
+- **Component CSS helpers (`src/index.css`)**:
+  - `.glass-card`: border + translucent `#fffaff` + `16px` blur + shadow.
+  - `.media-image-loading`: gradient shimmer overlay used automatically inside `ShimmerImage`.
+  - `.no-scrollbar` & `.custom-scrollbar`: consistent overflow scrollbars.
+
+### Icon System (Material Symbols Outlined)
+
+- Loaded via `#google-material-symbols` in `index.html`.
+- `src/main.jsx` calls `waitForGoogleIcons()` and adds `.icons-loaded` to `<html>`; `.material-symbols-outlined` remains hidden until loaded to prevent raw ligature text flash.
+- Always reserve icon space with `<span className="material-symbols-outlined text-[18px]">icon_name</span>` (or `text-[16px]`, `text-[20px]`, `text-2xl`).
+- Every icon-only button **must** include `aria-label="..."`.
+- Common icon names in NexaOps: `dashboard`, `inventory_2`, `collections_bookmark`, `photo_library`, `shopping_cart`, `group`, `insights`, `settings`, `add`, `save`, `lock`, `local_shipping`, `edit`, `delete`, `close`, `search`, `check_circle`, `error`, `progress_activity`, `expand_more`.
+
+---
+
+## 3. Navigation & Standard Page Shell
+
+Sidebar navigation is owned exclusively by [`App.jsx`](src/App.jsx) using `NAV_ITEMS` from [`src/constants/navigation.js`](src/constants/navigation.js). **Never duplicate the sidebar inside page components.**
+
+### Registered Routes (`src/App.jsx` & `src/constants/navigation.js`)
+
+| Route | Component | Sidebar Label & Icon |
+| :--- | :--- | :--- |
+| `/` | `Dashboard` | `Dashboard` (`dashboard`) |
+| `/inventory` | `Inventory` | `Inventory` (`inventory_2`) |
+| `/inventory/add-product` | `AddProduct` | — (child of Inventory) |
+| `/collections` | `Collection` | `Collections` (`collections_bookmark`) |
+| `/collections/add-collection` | `AddCollection` | — (child of Collections) |
+| `/media-gallery` | `MediaGallery` | `Media Gallery` (`photo_library`) |
+| `/orders` | `Orders` | `Orders` (`shopping_cart`) |
+| `/orders/create-order` | `CreateOrder` | — (child of Orders) |
+| `/customers` | `Customers` | `Customers` (`group`) |
+| `/customers/add-customer` | `AddCustomer` | — (child of Customers) |
+| `/analytics` | `Analytics` | `Analytics` (`insights`) |
+| `/settings` | `Settings` | `Settings` (`settings`) |
+| `/about` | `About` | — (standalone route) |
+
+Desktop sidebar supports collapse (`w-20` vs `w-72`, saved under `nexaops_desktop_nav_collapsed`), triggered by [`PageHeader`](src/components/PageHeader.jsx) dispatching `"open-mobile-navigation"` (`< 768px`) or `"toggle-desktop-navigation"` (`>= 768px`).
+
+### Standard Page Shell
+
+Every top-level and form page follows this shell:
 
 ```jsx
 <>
-  <PageHeader title="Page Name" buttonLabel="Primary Action" />
-  <main className="min-h-screen bg-background pb-24 text-on-surface md:pb-6">
-    <div className="mx-auto max-w-7xl space-y-8 px-4 py-6 md:px-8 md:py-8">
-      {/* page content */}
+  <PageHeader
+    title="Page Name"
+    buttonLabel="Primary Action"
+    buttonIcon="add"
+    onButtonClick={handlePrimaryAction}
+  />
+
+  <main className="min-h-screen bg-background pb-24 text-on-surface md:pb-8">
+    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
+      {/* Page sections */}
     </div>
   </main>
 </>
 ```
 
-Rules:
+*Note:* `Dashboard.jsx` uses its own sticky search/notification `<header>` tailored to `h-20` with the same `border-b border-outline-variant/60 bg-surface/90 backdrop-blur-xl` contract; all other pages use `<PageHeader />`.
 
-- `App.jsx` owns the sidebar. Do not duplicate sidebar navigation inside pages.
-- Use `PageHeader` unless the page needs search, notifications, or multiple header actions like `Dashboard.jsx`.
-- Custom headers must match the same shell: sticky, `h-20`, `bg-surface/90`, border, blur, and subtle shadow.
-- Main content should use `max-w-7xl`, `px-4`, `md:px-8`, and vertical spacing between sections.
+---
 
-## Standard Components
+## 4. Standard Components & Patterns
 
-### Card
+### `<PageHeader />` (`src/components/PageHeader.jsx`)
 
-Use this for repeated sections, metric cards, forms, profile panels, and settings groups:
+Props:
+- `title`: Header heading (eyebrow displays `"NexaOps Console"`)
+- `buttonLabel`, `buttonIcon`, `onButtonClick`, `buttonTo`, `buttonDisabled`
+- `secondaryButtonLabel`, `secondaryButtonIcon`, `onSecondaryButtonClick`, `secondaryButtonTo`
+
+When `buttonDisabled={true}` (used during saving or missing required fields in `AddProduct.jsx` and `AddCollection.jsx`), `PageHeader` applies muted disabled styles (`disabled:cursor-not-allowed disabled:bg-surface-container-high disabled:text-on-surface-variant/50 disabled:shadow-none`) and displays `"lock"` as `buttonIcon`.
+
+### Glassmorphic Card
+
+Used for form sections, metric cards, panels, and settings groups across all pages:
 
 ```jsx
-<section className="rounded-2xl border border-outline-variant/60 bg-surface-container/70 p-5 shadow-[0_16px_45px_rgba(50,35,75,0.10)] backdrop-blur-xl">
-  {/* content */}
-</section>
+const cardClass =
+  "rounded-2xl border border-outline-variant/60 bg-surface-container/70 p-6 shadow-[0_16px_45px_rgba(50,35,75,0.08)] backdrop-blur-xl";
 ```
 
-### Toolbar
+*(Compact summary/analytics cards may use `p-5`.)*
 
-Use this for search, filter, sort, date range, and view controls:
+### Form Inputs & Labels
 
 ```jsx
-<div className="flex flex-col gap-4 rounded-2xl border border-outline-variant/60 bg-surface-container/70 p-4 shadow-lg backdrop-blur-xl md:flex-row md:items-center">
-  {/* controls */}
-</div>
+const inputClass =
+  "w-full rounded-xl border border-outline-variant/40 bg-surface-container-low px-4 py-2.5 text-body-base text-on-surface placeholder:text-on-surface-variant/50 transition-all focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary";
+
+const inputWithIconClass =
+  "w-full rounded-xl border border-outline-variant/40 bg-surface-container-low pl-10 pr-4 py-2.5 text-body-base text-on-surface placeholder:text-on-surface-variant/50 transition-all focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary";
 ```
 
-### Search Input
+Label convention:
 
 ```jsx
-<label className="group relative w-full md:flex-1">
-  <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary">
-    search
-  </span>
-  <input
-    className="w-full rounded-xl border border-outline-variant/40 bg-surface-container-low py-3 pl-12 pr-4 text-body-base text-on-surface transition-all focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-    placeholder="Search..."
-    type="search"
-  />
+<label className="font-label-mono text-[10px] uppercase tracking-widest text-on-surface-variant">
+  Field Name <span className="text-error">*</span>
 </label>
 ```
 
-### Primary Button
+### Buttons (Primary, Secondary, & Locked Validation State)
+
+**Primary Pill CTA** (used in `PageHeader`, `AddProduct.jsx`, `AddCollection.jsx`, `CreateOrder.jsx`):
 
 ```jsx
-<button className="flex items-center gap-2 rounded-full bg-primary px-4 py-2 font-title-md text-on-primary shadow-[0_6px_16px_rgba(109,59,215,0.16)] transition-all hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-95 sm:px-6">
-  <span className="material-symbols-outlined text-[20px]">add</span>
-  <span className="hidden sm:inline">Add New</span>
-</button>
-```
-
-### Secondary Button
-
-```jsx
-<button className="flex items-center justify-center gap-2 rounded-xl border border-outline-variant/50 bg-surface-container-low px-4 py-2.5 text-on-surface-variant transition-all hover:bg-primary/5 hover:text-primary">
-  <span className="material-symbols-outlined text-[20px]">filter_list</span>
-  <span className="font-label-mono text-[10px] uppercase tracking-widest">Filter</span>
-</button>
-```
-
-### Status Badge
-
-```jsx
-<span className="rounded-full bg-primary-container px-2.5 py-1 text-xs font-medium text-on-primary-container">
-  Active
-</span>
-```
-
-Use `error-container` for warnings, `surface-container-high` for neutral statuses, and `primary-container` for positive statuses.
-
-## Layout Patterns
-
-### Metrics Row
-
-Use for dashboard, user profile stats, store health, revenue, or settings summary.
-
-```jsx
-<section className="grid grid-cols-1 gap-gutter sm:grid-cols-2 xl:grid-cols-4">
-  {/* metric cards */}
-</section>
-```
-
-### Main And Side Panel
-
-Use for user detail pages and settings pages.
-
-```jsx
-<section className="grid grid-cols-1 gap-gutter xl:grid-cols-12">
-  <div className="space-y-6 xl:col-span-8">
-    {/* primary content */}
-  </div>
-  <aside className="space-y-6 xl:col-span-4">
-    {/* summary, quick actions, notes */}
-  </aside>
-</section>
-```
-
-### Table
-
-Use for orders, user activity, addresses, staff members, payments, and audit logs.
-
-```jsx
-<section className="overflow-hidden rounded-2xl border border-outline-variant/60 bg-surface-container/70 shadow-[0_16px_45px_rgba(50,35,75,0.10)] backdrop-blur-xl">
-  <div className="border-b border-outline-variant/40 p-5">
-    <h3 className="text-xl font-semibold">Table Title</h3>
-    <p className="mt-1 text-body-base text-on-surface-variant">Short helpful description.</p>
-  </div>
-  <div className="overflow-x-auto">
-    <table className="w-full min-w-[680px] text-left text-sm">
-      {/* table rows */}
-    </table>
-  </div>
-</section>
-```
-
-## Forms
-
-Use forms for add product, profile editing, store settings, shipping settings, and security settings.
-
-Form rules:
-
-- Group related fields inside standard cards.
-- Keep labels small and clear.
-- Use `rounded-xl` inputs.
-- Use `bg-surface-container-low` for input backgrounds.
-- Put save actions either in `PageHeader` or at the bottom of the form card.
-- Use two columns at `md` and above only when fields are short.
-
-Input style:
-
-```jsx
-<label className="block">
-  <span className="font-label-mono text-[10px] uppercase tracking-widest text-on-surface-variant">
-    Store name
+<button
+  type="button"
+  disabled={isSaveDisabled}
+  onClick={handleSubmit}
+  className="flex cursor-pointer items-center gap-2 rounded-full bg-primary px-5 py-2 font-title-md text-sm text-on-primary shadow-[0_6px_16px_rgba(109,59,215,0.18)] transition-all hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+>
+  <span className="material-symbols-outlined text-[18px]">
+    {isSaveDisabled && !isSubmitting ? "lock" : "save"}
   </span>
-  <input
-    className="mt-2 w-full rounded-xl border border-outline-variant/40 bg-surface-container-low px-4 py-3 text-body-base text-on-surface focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-    type="text"
-  />
-</label>
+  <span>{isSubmitting ? "Saving..." : "Save Changes"}</span>
+</button>
 ```
 
-## Responsive Rules
-
-- Start with one column.
-- Expand at `sm`, `md`, `lg`, or `xl`.
-- Use `px-4` on mobile and `md:px-8` on larger screens.
-- Hide nonessential text labels on small screens.
-- Wrap tables with `overflow-x-auto`.
-- Keep cards readable on mobile; do not force dense desktop layouts onto phones.
-- Avoid text overlap by using `min-w-0`, `truncate`, and responsive wrapping.
-
-## Navigation System
-
-Sidebar navigation lives in `App.jsx`.
-
-Recommended routes:
+**Secondary Outline Pill** (Cancel / Draft / Reset):
 
 ```jsx
-{ label: "Dashboard", to: "/", icon: "dashboard" }
-{ label: "Inventory", to: "/inventory", icon: "inventory_2" }
-{ label: "Orders", to: "/orders", icon: "shopping_cart" }
-{ label: "Upload Images", to: "/upload-images", icon: "cloud_upload" }
-{ label: "Media Gallery", to: "/media-gallery", icon: "collections" }
-{ label: "Collections", to: "/collections", icon: "collections" }
-{ label: "Analytics", to: "/analytics", icon: "insights" }
-{ label: "Customers", to: "/customers", icon: "group" }
-{ label: "Users", to: "/users", icon: "person" }
-{ label: "Settings", to: "/settings", icon: "settings" }
+<button
+  type="button"
+  onClick={() => navigate("/parent-route")}
+  className="cursor-pointer rounded-full border border-outline-variant/60 bg-surface-container-high/60 px-5 py-2 font-label-mono text-xs uppercase tracking-wider text-on-surface-variant transition-all hover:bg-surface-container hover:text-on-surface active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+>
+  Cancel
+</button>
 ```
 
-Suggested page files:
+### `<ListFilterToolbar />` & `<ToolbarSelect />` (`src/components/ListFilterToolbar.jsx`)
 
-- `src/pages/Users.jsx`
-- `src/pages/UserDetails.jsx`
-- `src/pages/Settings.jsx`
-- `src/pages/Orders.jsx`
-- `src/pages/Analytics.jsx`
-- `src/pages/Customers.jsx`
+Standard toolbar for list pages (`Inventory.jsx`, `Collection.jsx`, `Orders.jsx`, `Customers.jsx`). Supports:
+- Status/tier filter `tabs` (`[{ id, label, count }]`) with tabular pill counts
+- Debounced/controlled `searchQuery` input with left `search` icon and clear button
+- Child filter dropdown slots rendered with `<ToolbarSelect ariaLabel="..." value={...} onChange={...} options={[...]} />`
+- Active filter count banner and `Reset filters` action (`hasActiveFilters`, `onResetFilters`)
 
-## User Page Blueprint
+### `<StatusBadge />` (`src/components/common/StatusBadge.jsx`)
 
-Use the User page for admin/staff account management. This is different from Customers, which should represent shoppers.
+Use `<StatusBadge status="..." />` instead of ad-hoc badge spans where supported. Supported status keys (case-insensitive):
+- Green (`emerald-500`): `active`, `delivered`, `completed`
+- Violet (`primary-container`): `processing`, `vip`
+- Blue (`blue-500`): `shipped`
+- Amber (`amber-500`): `pending`, `low_stock`
+- Sky (`sky-500`): `new`
+- Red (`error-container`): `out_of_stock`, `cancelled`
+- Neutral (`surface-container-high`): `draft`, `scheduled`
 
-Recommended route:
+### `<ShimmerImage />` (`src/components/common/ShimmerImage.jsx`)
 
-- List page: `/users`
-- Detail page: `/users/:id`
+Wraps product and media images with `.media-image-loading` skeleton shimmer during load and falls back cleanly to a Material symbol (`fallbackIcon="broken_image"`) when missing or errored.
 
-Recommended header:
+### `<ConfirmModal />` & Dialog Modals (`src/components/common/ConfirmModal.jsx`, `GalleryDialog.jsx`)
 
-```jsx
-<PageHeader title="Users" buttonLabel="Invite User" />
-```
+- Overlay: `fixed inset-0 z-50` (or `z-[100]`) `flex items-center justify-center bg-inverse-surface/45 p-4 backdrop-blur-sm`
+- Panel: `rounded-2xl border border-outline-variant/60 bg-surface-container-lowest shadow-[0_24px_70px_rgba(50,35,75,0.18)]`
+- Behavior: `role="dialog" aria-modal="true"`, Escape-key dismissal, backdrop click dismissal when not loading, explicit loading state labels (`Deleting...`).
 
-Recommended sections:
-
-- Summary metrics: total users, active users, pending invites, admin users.
-- Toolbar: search by name/email, filter by role, filter by status.
-- User table: name, email, role, status, last active, actions.
-- Invite panel or modal: email, role, optional message.
-- Activity side panel: latest logins, permission changes, password resets.
-
-Useful user roles:
-
-- Owner
-- Admin
-- Manager
-- Editor
-- Support
-- Viewer
-
-Useful statuses:
-
-- Active
-- Pending invite
-- Suspended
-- Two-factor required
-
-Recommended table columns:
-
-- User
-- Role
-- Status
-- Last active
-- Access
-- Actions
-
-Visual idea:
-
-- Put the user avatar or initials in a rounded circle.
-- Use `primary-container` for Active.
-- Use `surface-container-high` for Pending invite.
-- Use `error-container` for Suspended.
-- Use icon actions: `visibility`, `edit`, `more_vert`.
-
-## User Details Page Blueprint
-
-Recommended header:
+### Notification / Alert Banner
 
 ```jsx
-<PageHeader title="User Profile" buttonLabel="Save Changes" />
-```
-
-Recommended layout:
-
-- Left side: profile form, permissions, assigned store areas.
-- Right side: avatar card, account status, security summary, quick actions.
-
-Recommended cards:
-
-- Profile Information: name, email, phone, role.
-- Permissions: inventory, orders, media, collections, analytics, settings.
-- Security: two-factor status, password updated date, active sessions.
-- Activity Log: recent login and admin actions.
-
-Good actions:
-
-- Save changes.
-- Send password reset.
-- Require two-factor authentication.
-- Suspend user.
-
-## Settings Page Blueprint
-
-Use Settings as a grouped admin control center. Keep it calm and organized.
-
-Recommended route:
-
-- `/settings`
-
-Recommended header:
-
-```jsx
-<PageHeader title="Settings" buttonLabel="Save Changes" />
-```
-
-Recommended top summary:
-
-- Store status.
-- Payment status.
-- Shipping zones.
-- Team access.
-
-Recommended settings groups:
-
-- Store Profile: store name, support email, phone, country, timezone.
-- Brand Appearance: logo, favicon, accent color preview, storefront name.
-- Commerce: currency, tax mode, inventory tracking, low-stock threshold.
-- Payments: payment provider status, payout account, test mode toggle.
-- Shipping: default shipping method, free shipping threshold, zones.
-- Notifications: order emails, low-stock alerts, customer messages.
-- Security: two-factor requirement, staff invite rules, session timeout.
-- Integrations: analytics, email provider, image storage, webhooks.
-
-Recommended layout:
-
-```jsx
-<section className="grid grid-cols-1 gap-gutter xl:grid-cols-12">
-  <div className="space-y-6 xl:col-span-8">
-    {/* settings forms */}
+{notification && (
+  <div
+    className={`flex items-center justify-between gap-3 rounded-2xl border p-4 text-sm transition-all ${
+      notification.type === "error"
+        ? "border-error/30 bg-error-container/80 text-on-error-container"
+        : "border-primary/30 bg-primary-container/80 text-on-primary-container"
+    }`}
+  >
+    <div className="flex items-center gap-2">
+      <span className="material-symbols-outlined text-[20px]">
+        {notification.type === "error" ? "error" : "check_circle"}
+      </span>
+      <span className="font-medium">{notification.message}</span>
+    </div>
+    <button
+      type="button"
+      aria-label="Dismiss notification"
+      onClick={() => setNotification(null)}
+      className="cursor-pointer p-1 hover:opacity-80"
+    >
+      <span className="material-symbols-outlined text-sm">close</span>
+    </button>
   </div>
-  <aside className="space-y-6 xl:col-span-4">
-    {/* status summary and quick links */}
-  </aside>
-</section>
+)}
 ```
 
-Recommended controls:
+---
 
-- Text inputs for store identity.
-- Select menus for currency, timezone, tax mode, and session timeout.
-- Toggles for notifications, test mode, and security rules.
-- Numeric inputs for low-stock threshold and free shipping minimum.
-- File/image picker for logo and favicon.
+## 5. Standard Page Layouts
 
-## Additional Page Ideas
+### A. List / Directory Page (`Orders.jsx`, `Inventory.jsx`, `Collection.jsx`, `Customers.jsx`)
 
-High-priority pages for this frontend:
+1. `<PageHeader />` routing to the create view or opening a creation modal.
+2. Minimal title section (`font-label-mono text-[10px] uppercase tracking-[0.2em] text-primary` eyebrow + `<h1>` + subtitle).
+3. Optional 3-column or 4-column KPI summary row (`grid-cols-1 gap-6 md:grid-cols-3` or `sm:grid-cols-2 xl:grid-cols-4`).
+4. `<ListFilterToolbar>` with status tabs, search, and `<ToolbarSelect>` filters.
+5. Glassmorphic table (`<div className="overflow-x-auto"><table className="w-full min-w-[640px] text-left text-sm">`) or responsive card grid (`grid-cols-1 gap-gutter sm:grid-cols-2 lg:grid-cols-3`).
 
-- Orders page: order queue, statuses, fulfillment actions, payment status.
-- Customers page: shopper list, lifetime value, order history, segments.
-- Analytics page: sales trends, conversion, average order value, top products.
-- Discounts page: coupon codes, automatic discounts, eligibility rules.
-- Reviews page: product reviews, moderation, response status.
-- Shipping page: shipping zones, carrier rules, delivery estimates.
-- Payments page: transactions, refunds, payout status.
-- Storefront page: homepage sections, featured products, hero banners.
-- Notifications page: email templates and alert preferences.
+### B. Create / Edit Form Page (`AddProduct.jsx`, `AddCollection.jsx`, `CreateOrder.jsx`)
 
-Best next pages to build:
+1. `<PageHeader />` with `buttonDisabled` and `lock` icon until required fields pass validation.
+2. Top Breadcrumb + Action Row:
+   - Parent `<Link>` (`text-primary font-label-mono text-[10px] uppercase tracking-widest hover:underline`) + `/` + protocol label
+   - `<h1>` (`font-headline-lg text-2xl tracking-tight text-on-surface md:text-headline-lg`)
+   - Action pills (`Cancel`, optional secondary draft/add pill, primary `Save` / `Save & Dispatch` pill).
+3. Dismissible feedback banner (`error` / `success`).
+4. Asymmetric 12-column grid (`grid grid-cols-1 gap-gutter lg:grid-cols-12 items-start`):
+   - **Main stream** (`space-y-6 lg:col-span-8` or `lg:col-span-7`): Form detail cards, line items, addresses, media manager, notes.
+   - **Sticky sidebar** (`space-y-6 lg:col-span-4 lg:sticky lg:top-28` or `lg:col-span-5`): Workflow selects, statuses, payment configuration, summary/financial ledger card, primary authorize CTA.
 
-1. `Users.jsx` because it matches the existing sidebar idea and is useful for admin access.
-2. `Settings.jsx` because it gives the store a control center.
-3. `Orders.jsx` because the dashboard already links to order management.
-4. `Customers.jsx` because it completes the ecommerce admin flow.
+---
 
-## Implementation Checklist
+## 6. Responsive & Accessibility Checklist
 
-Before building a new page:
+- **Mobile-first grids**: Always stack in `grid-cols-1` on phones and expand cleanly at `sm:`, `md:`, `lg:`, `xl:`.
+- **Prevent text collision**: Apply `min-w-0` on flex children and `truncate` on dynamic names/emails; keep tables inside `overflow-x-auto`.
+- **Page spacing**: Use `px-4 md:px-8` horizontal padding and `pb-24 md:pb-8` bottom clearance.
+- **Interactive polish**: All clickable buttons include `cursor-pointer`; avoid disabling focus outlines without `:focus-visible` fallback (`index.css` sets `outline: 2px solid #6d3bd7`).
+- **Accessible dialogs & drawers**: Use `role="dialog"`, `aria-modal="true"`, Escape listeners, and explicit `aria-label` on close/step/remove buttons.
 
-1. Inspect `tailwind.config.js`.
-2. Inspect a nearby existing page.
-3. Use `PageHeader` unless a custom header is needed.
-4. Use the standard shell.
-5. Reuse the card, toolbar, input, badge, and table patterns above.
-6. Add the route in `App.jsx`.
-7. Add or update the sidebar item in `App.jsx`.
-8. Keep API/state behavior separate from visual markup.
-9. Run `npm.cmd run build`.
-10. Run `npm.cmd run lint` if the project has a lint script.
+---
 
-## Quick Starter: Users Page
+## 7. Frontend Architecture & Verification Rules
 
-```jsx
-import PageHeader from "../components/PageHeader";
+Directory conventions in `frontend/src/`:
+- `api/` — Axios client (`axios.js`) and endpoint wrappers (`products.js`, `collections.js`, `orders.js`, `settings.js`, `image.js`).
+- `components/` — Shared layout (`PageHeader`, `ListFilterToolbar`, `NexaOpsLogo`, `GalleryDialog`, `UploadDialog`, `ImagePreview`), `common/` (`StatusBadge`, `ConfirmModal`, `ShimmerImage`), and domain folders (`product/`).
+- `constants/` — UI static datasets, navigation items, and filter definitions (`navigation.js`, `orders.js`, `customers.js`, `analytics.js`, `dashboard.js`, `settings.js`).
+- `hooks/` — Data fetching and state orchestration hooks (`useOrders.js`, `useProducts.js`, `useDashboard.js`, `useImageLoader.js`) exported through `hooks/index.js`. Keep complex `useEffect` fetching out of JSX pages where hooks fit.
+- `utils/` — Pure helpers (`formatCurrency`, `formatNumber`, `formatDate`, `slugify` in `utils/formatters.js`). Always use `formatCurrency` instead of hardcoding currency symbols inside summaries.
 
-function Users() {
-  return (
-    <>
-      <PageHeader title="Users" buttonLabel="Invite User" />
-      <main className="min-h-screen bg-background pb-24 text-on-surface md:pb-6">
-        <div className="mx-auto max-w-7xl space-y-8 px-4 py-6 md:px-8 md:py-8">
-          <section className="grid grid-cols-1 gap-gutter sm:grid-cols-2 xl:grid-cols-4">
-            {/* metric cards */}
-          </section>
-
-          <section className="rounded-2xl border border-outline-variant/60 bg-surface-container/70 p-4 shadow-lg backdrop-blur-xl">
-            {/* search, filter, role controls */}
-          </section>
-
-          <section className="overflow-hidden rounded-2xl border border-outline-variant/60 bg-surface-container/70 shadow-[0_16px_45px_rgba(50,35,75,0.10)] backdrop-blur-xl">
-            {/* users table */}
-          </section>
-        </div>
-      </main>
-    </>
-  );
-}
-
-export default Users;
-```
-
-## Quick Starter: Settings Page
-
-```jsx
-import PageHeader from "../components/PageHeader";
-
-function Settings() {
-  return (
-    <>
-      <PageHeader title="Settings" buttonLabel="Save Changes" />
-      <main className="min-h-screen bg-background pb-24 text-on-surface md:pb-6">
-        <div className="mx-auto max-w-7xl space-y-8 px-4 py-6 md:px-8 md:py-8">
-          <section className="grid grid-cols-1 gap-gutter xl:grid-cols-12">
-            <div className="space-y-6 xl:col-span-8">
-              {/* store profile, commerce, notifications, security */}
-            </div>
-            <aside className="space-y-6 xl:col-span-4">
-              {/* settings status and quick actions */}
-            </aside>
-          </section>
-        </div>
-      </main>
-    </>
-  );
-}
-
-export default Settings;
-```
+Required checks before finishing any frontend change (run inside `frontend/`):
+- `npm run lint` (`oxlint` — `.oxlintrc.json` enforces `react/rules-of-hooks: error` and `react/only-export-components: warn`; avoid exporting constants/helpers alongside components in `.jsx` files).
+- `npm test` (`node --test src/**/__tests__/*.test.js`).
+- `npm run build` (`vite build`).

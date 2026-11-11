@@ -408,56 +408,41 @@ function CreateOrder() {
                     <label className="font-label-mono text-[10px] uppercase tracking-widest text-on-surface-variant">
                       Client Full Name <span className="text-error">*</span>
                     </label>
-                    <div className="relative flex items-center">
-                      <span className="material-symbols-outlined absolute left-3.5 text-outline text-[18px]">
-                        badge
-                      </span>
-                      <input
-                        className={inputWithIconClass}
-                        type="text"
-                        placeholder="Full name of client"
-                        value={customer}
-                        onChange={(e) => setCustomer(e.target.value)}
-                        required
-                      />
-                    </div>
+                    <input
+                      className={inputClass}
+                      type="text"
+                      placeholder="Full name of client"
+                      value={customer}
+                      onChange={(e) => setCustomer(e.target.value)}
+                      required
+                    />
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="font-label-mono text-[10px] uppercase tracking-widest text-on-surface-variant">
                       Email Address <span className="text-error">*</span>
                     </label>
-                    <div className="relative flex items-center">
-                      <span className="material-symbols-outlined absolute left-3.5 text-outline text-[18px]">
-                        mail
-                      </span>
-                      <input
-                        className={inputWithIconClass}
-                        type="email"
-                        placeholder="client@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                      />
-                    </div>
+                    <input
+                      className={inputClass}
+                      type="email"
+                      placeholder="client@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
                   </div>
 
                   <div className="space-y-1.5 sm:col-span-2">
                     <label className="font-label-mono text-[10px] uppercase tracking-widest text-on-surface-variant">
                       Phone Number
                     </label>
-                    <div className="relative flex items-center">
-                      <span className="material-symbols-outlined absolute left-3.5 text-outline text-[18px]">
-                        phone
-                      </span>
-                      <input
-                        className={inputWithIconClass}
-                        type="text"
-                        placeholder="+1 (555) 000-0000"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                      />
-                    </div>
+                    <input
+                      className={inputClass}
+                      type="text"
+                      placeholder="+1 (555) 000-0000"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                    />
                   </div>
                 </div>
               </section>

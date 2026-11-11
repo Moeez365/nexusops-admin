@@ -12,6 +12,7 @@ import CreateOrder from "./pages/CreateOrder";
 import Settings from "./pages/Settings";
 import Analytics from "./pages/Analytics";
 import Customers from "./pages/Customers";
+import AddCustomer from "./pages/AddCustomer";
 import NexaOpsLogo from "./components/NexaOpsLogo";
 import {
   NAV_ITEMS,
@@ -291,7 +292,10 @@ function App() {
             <Routes>
               <Route index element={<Dashboard />} />
               <Route path="/analytics" element={<Analytics />} />
-              <Route path="/customers" element={<Customers />} />
+              <Route path="/customers">
+                <Route index element={<Customers />} />
+                <Route path="add-customer" element={<AddCustomer />} />
+              </Route>
               <Route path="/about" element={<About />} />
               <Route path="/orders">
                 <Route index element={<Orders />} />

@@ -118,7 +118,7 @@ function Customers() {
         title="Customers"
         buttonLabel="Add Customer"
         buttonIcon="person_add"
-        onButtonClick={() => {}}
+        buttonTo="/customers/add-customer"
       />
 
       <main className="min-h-screen bg-background pb-24 text-on-surface md:pb-10">
