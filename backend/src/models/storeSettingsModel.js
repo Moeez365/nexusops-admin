@@ -11,7 +11,7 @@ const currencySchema = new mongoose.Schema(
     exchangeRate: { type: Number, default: 1.0, min: 0 },
     isActive: { type: Boolean, default: true },
   },
-  { _id: false }
+  { _id: false },
 );
 
 /**
@@ -19,7 +19,10 @@ const currencySchema = new mongoose.Schema(
  */
 const shippingZoneSchema = new mongoose.Schema(
   {
-    id: { type: String, default: () => new mongoose.Types.ObjectId().toString() },
+    id: {
+      type: String,
+      default: () => new mongoose.Types.ObjectId().toString(),
+    },
     name: { type: String, required: true, trim: true },
     regions: { type: [String], default: [] },
     rate: { type: Number, default: 0, min: 0 },
@@ -27,7 +30,7 @@ const shippingZoneSchema = new mongoose.Schema(
     estimatedDays: { type: String, default: "2-4 business days" },
     isActive: { type: Boolean, default: true },
   },
-  { _id: true }
+  { _id: true },
 );
 
 /**
@@ -40,12 +43,12 @@ const transitNodeSchema = new mongoose.Schema(
     statusColor: { type: String, default: "bg-primary" }, // bg-primary, bg-error, etc.
     activeDispatches: { type: Number, default: 0, min: 0 },
   },
-  { _id: true }
+  { _id: true },
 );
 
 /**
  * Store Settings Schema
- * 
+ *
  * Central collection for all store settings, commerce defaults, payment configurations,
  * fulfillment logistics, notifications, staff security, and analytics baseline targets.
  */
@@ -62,8 +65,17 @@ const storeSettingsSchema = new mongoose.Schema(
     // ── 1. Store Profile & Brand Identity ──
     storeProfile: {
       storeName: { type: String, default: "NexaOps Store", trim: true },
-      tagline: { type: String, default: "Haute Horlogerie & Bespoke Atelier", trim: true },
-      supportEmail: { type: String, default: "support@nexaops.store", trim: true, lowercase: true },
+      tagline: {
+        type: String,
+        default: "Haute Horlogerie & Bespoke Atelier",
+        trim: true,
+      },
+      supportEmail: {
+        type: String,
+        default: "support@nexaops.store",
+        trim: true,
+        lowercase: true,
+      },
       supportPhone: { type: String, default: "+33 1 42 68 55 00", trim: true },
       country: { type: String, default: "France", trim: true },
       timezone: { type: String, default: "Europe/Paris", trim: true },
@@ -91,10 +103,34 @@ const storeSettingsSchema = new mongoose.Schema(
       supportedCurrencies: {
         type: [currencySchema],
         default: [
-          { code: "EUR", symbol: "€", name: "Euro", exchangeRate: 1.0, isActive: true },
-          { code: "USD", symbol: "$", name: "US Dollar", exchangeRate: 1.08, isActive: true },
-          { code: "AED", symbol: "AED", name: "UAE Dirham", exchangeRate: 3.97, isActive: true },
-          { code: "GBP", symbol: "£", name: "British Pound", exchangeRate: 0.85, isActive: true },
+          {
+            code: "EUR",
+            symbol: "€",
+            name: "Euro",
+            exchangeRate: 1.0,
+            isActive: true,
+          },
+          {
+            code: "USD",
+            symbol: "$",
+            name: "US Dollar",
+            exchangeRate: 1.08,
+            isActive: true,
+          },
+          {
+            code: "AED",
+            symbol: "AED",
+            name: "UAE Dirham",
+            exchangeRate: 3.97,
+            isActive: true,
+          },
+          {
+            code: "GBP",
+            symbol: "£",
+            name: "British Pound",
+            exchangeRate: 0.85,
+            isActive: true,
+          },
         ],
       },
       taxMode: {
@@ -134,18 +170,25 @@ const storeSettingsSchema = new mongoose.Schema(
         },
         bankTransfer: {
           enabled: { type: Boolean, default: true },
-          bankName: { type: String, default: "Banque Privée Edmond de Rothschild" },
+          bankName: {
+            type: String,
+            default: "Banque Privée Edmond de Rothschild",
+          },
           iban: { type: String, default: "FR76 3000 4000 1234 5678 9012 345" },
           bic: { type: String, default: "ROTHFR2PXXX" },
           instructions: {
             type: String,
-            default: "Please include your Order ID in the transfer reference for immediate atelier clearing.",
+            default:
+              "Please include your Order ID in the transfer reference for immediate atelier clearing.",
           },
         },
         cashOnDelivery: {
           enabled: { type: Boolean, default: false },
           maxAmount: { type: Number, default: 3000 },
-          instructions: { type: String, default: "Available only for metropolitan concierge delivery." },
+          instructions: {
+            type: String,
+            default: "Available only for metropolitan concierge delivery.",
+          },
         },
         cryptoEscrow: {
           enabled: { type: Boolean, default: true },
@@ -153,7 +196,8 @@ const storeSettingsSchema = new mongoose.Schema(
           walletAddress: { type: String, default: "0x71C...NexaOpsVault" },
           instructions: {
             type: String,
-            default: "Locked in smart escrow pending physical delivery inspection and valet sign-off.",
+            default:
+              "Locked in smart escrow pending physical delivery inspection and valet sign-off.",
           },
         },
       },
@@ -168,7 +212,14 @@ const storeSettingsSchema = new mongoose.Schema(
         default: [
           {
             name: "Western Europe Atelier Priority",
-            regions: ["France", "Switzerland", "Monaco", "Italy", "Germany", "United Kingdom"],
+            regions: [
+              "France",
+              "Switzerland",
+              "Monaco",
+              "Italy",
+              "Germany",
+              "United Kingdom",
+            ],
             rate: 0,
             freeThreshold: 1000,
             estimatedDays: "1-2 business days",
@@ -253,10 +304,30 @@ const storeSettingsSchema = new mongoose.Schema(
           },
         ],
         default: [
-          { stage: "Storefront Visits", count: "48,920", rate: "100%", delta: "+18.4%" },
-          { stage: "Product Views", count: "19,410", rate: "39.7%", delta: "+11.2%" },
-          { stage: "Added to Bag", count: "4,280", rate: "8.7%", delta: "+6.4%" },
-          { stage: "Completed Checkout", count: "1,420", rate: "2.9%", delta: "+8.5%" },
+          {
+            stage: "Storefront Visits",
+            count: "48,920",
+            rate: "100%",
+            delta: "+18.4%",
+          },
+          {
+            stage: "Product Views",
+            count: "19,410",
+            rate: "39.7%",
+            delta: "+11.2%",
+          },
+          {
+            stage: "Added to Bag",
+            count: "4,280",
+            rate: "8.7%",
+            delta: "+6.4%",
+          },
+          {
+            stage: "Completed Checkout",
+            count: "1,420",
+            rate: "2.9%",
+            delta: "+8.5%",
+          },
         ],
       },
       regionalDemandTargets: {
@@ -269,10 +340,30 @@ const storeSettingsSchema = new mongoose.Schema(
           },
         ],
         default: [
-          { region: "Paris & Western Europe", share: "38%", value: "$48,811", trend: "+16.2%" },
-          { region: "New York & North America", share: "31%", value: "$39,820", trend: "+12.8%" },
-          { region: "Dubai & GCC Private Clients", share: "19%", value: "$24,405", trend: "+21.5%" },
-          { region: "Tokyo & Asia-Pacific", share: "12%", value: "$15,414", trend: "+9.4%" },
+          {
+            region: "Paris & Western Europe",
+            share: "38%",
+            value: "$48,811",
+            trend: "+16.2%",
+          },
+          {
+            region: "New York & North America",
+            share: "31%",
+            value: "$39,820",
+            trend: "+12.8%",
+          },
+          {
+            region: "Dubai & GCC Private Clients",
+            share: "19%",
+            value: "$24,405",
+            trend: "+21.5%",
+          },
+          {
+            region: "Tokyo & Asia-Pacific",
+            share: "12%",
+            value: "$15,414",
+            trend: "+9.4%",
+          },
         ],
       },
     },
@@ -281,7 +372,7 @@ const storeSettingsSchema = new mongoose.Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 /**
@@ -299,4 +390,3 @@ storeSettingsSchema.statics.getSettings = async function () {
 const StoreSettings = mongoose.model("StoreSettings", storeSettingsSchema);
 
 export default StoreSettings;
-

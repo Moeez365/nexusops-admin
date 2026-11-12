@@ -383,11 +383,19 @@ function AddCustomer() {
                   : "border-primary/30 bg-primary-container/80 text-on-primary-container"
               }`}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="material-symbols-outlined text-[20px]">
                   {notification.type === "error" ? "error" : "check_circle"}
                 </span>
                 <span className="font-medium">{notification.message}</span>
+                {notification.type === "success" && (
+                  <Link
+                    to="/customers"
+                    className="ml-1 font-label-mono text-[11px] uppercase tracking-wider underline hover:opacity-80"
+                  >
+                    View Customers →
+                  </Link>
+                )}
               </div>
               <button
                 type="button"

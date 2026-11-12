@@ -34,6 +34,17 @@ test("updateUserDetails throws a 400 error when given an invalid ObjectId", asyn
   );
 });
 
+test("updateUserDetails throws a 400 error when given a password under 6 characters", async () => {
+  await assert.rejects(
+    async () => {
+      await updateUserDetails("507f1f77bcf86cd799439011", { password: "123" });
+    },
+    (err) =>
+      err.statusCode === 400 &&
+      err.message === "Password must be at least 6 characters"
+  );
+});
+
 test("removeUserAccount throws a 400 error when given an invalid ObjectId", async () => {
   await assert.rejects(
     async () => {

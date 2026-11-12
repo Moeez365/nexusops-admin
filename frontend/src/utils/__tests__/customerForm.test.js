@@ -5,6 +5,7 @@ import {
   INITIAL_CUSTOMER_FORM,
   buildCustomerPayload,
   evaluateCustomerReadiness,
+  formatCustomerLocation,
   getCustomerInitials,
   mapUserToForm,
 } from "../customerForm.js";
@@ -216,6 +217,33 @@ describe("mapUserToForm", () => {
       postalCode: "75001",
       country: "France",
     });
+  });
+});
+
+describe("formatCustomerLocation", () => {
+  it("prefers explicit customer location before address fields", () => {
+    assert.equal(
+      formatCustomerLocation({
+        location: "  Geneva, Switzerland ",
+        addresses: [{ city: "Paris", country: "France", isDefault: true }],
+      }),
+      "Geneva, Switzerland"
+    );
+  });
+
+  it("derives city and country from default address and falls back to em dash", () => {
+    assert.equal(
+      formatCustomerLocation({
+        location: "",
+        addresses: [
+          { city: "Lyon", country: "France", isDefault: false },
+          { city: "Paris", country: "France", isDefault: true },
+        ],
+      }),
+      "Paris, France"
+    );
+
+    assert.equal(formatCustomerLocation({}), "—");
   });
 });
 

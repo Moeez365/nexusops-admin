@@ -1,12 +1,15 @@
 import api from "./axios.js";
 
-export const getUsers = async (params = {}) => {
+export const getUsers = async (params = {}, signal) => {
   const cleanParams = Object.fromEntries(
     Object.entries(params).filter(
       ([_, value]) => value !== undefined && value !== null && value !== ""
     )
   );
-  const response = await api.get("/users", { params: cleanParams });
+  const response = await api.get("/users", {
+    params: cleanParams,
+    ...(signal ? { signal } : {}),
+  });
   return response.data;
 };
 
@@ -36,8 +39,11 @@ export const deleteUser = async (id) => {
   return response.data;
 };
 
-export const getUserStats = async () => {
-  const response = await api.get("/users/stats");
+export const getUserStats = async (signal) => {
+  const response = await api.get(
+    "/users/stats",
+    signal ? { signal } : undefined
+  );
   return response.data;
 };
 

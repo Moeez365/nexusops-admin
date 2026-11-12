@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 import User, { CUSTOMER_TIERS } from "../models/userModel.js";
 import { escapeRegex } from "../utils/sanitize.js";
 
@@ -118,15 +119,22 @@ export const createUserAccount = async (payload = {}) => {
     throw error;
   }
 
-  const existingUser = await User.findOne({ email: String(email).toLowerCase().trim() });
+  const existingUser = await User.findOne({ email});
   if (existingUser) {
     const error = new Error("A user with this email address already exists");
     error.statusCode = 409;
     throw error;
   }
+  if (
+    typeof payload.password === "string" &&
+    payload.password.length >= 6
+  ) {
+    payload.password = await bcrypt.hash(payload.password, 10);
+  }
 
   const user = await User.create(payload);
-  return user;
+  let {password, ...safeUser} = user.toObject();
+  return safeUser;
 };
 
 /**
@@ -139,11 +147,12 @@ export const updateUserDetails = async (userId, updatePayload = {}) => {
     throw error;
   }
 
+  const nextPayload = { ...updatePayload };
+
   // Prevent duplicate email collisions if updating email
-  if (updatePayload.email) {
-    const normalizedEmail = String(updatePayload.email).toLowerCase().trim();
+  if (nextPayload.email) {
     const existing = await User.findOne({
-      email: normalizedEmail,
+      email: nextPayload.email,
       _id: { $ne: userId },
     });
     if (existing) {
@@ -153,12 +162,22 @@ export const updateUserDetails = async (userId, updatePayload = {}) => {
     }
   }
 
-  // If password is not being updated, exclude it
-  if (!updatePayload.password) {
-    delete updatePayload.password;
+  // Validate and hash new password when provided; exclude if blank
+  if (
+    typeof nextPayload.password === "string" &&
+    nextPayload.password.length > 0
+  ) {
+    if (nextPayload.password.length < 6) {
+      const error = new Error("Password must be at least 6 characters");
+      error.statusCode = 400;
+      throw error;
+    }
+    nextPayload.password = await bcrypt.hash(nextPayload.password, 10);
+  } else {
+    delete nextPayload.password;
   }
 
-  const updatedUser = await User.findByIdAndUpdate(userId, updatePayload, {
+  const updatedUser = await User.findByIdAndUpdate(userId, nextPayload, {
     new: true,
     runValidators: true,
   });

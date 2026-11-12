@@ -128,3 +128,27 @@ export function mapUserToForm(user = {}) {
   };
 }
 
+/**
+ * Format a customer's display location from top-level location or default address.
+ */
+export function formatCustomerLocation(customer = {}) {
+  const explicitLocation = String(customer?.location || "").trim();
+  if (explicitLocation) return explicitLocation;
+
+  const addresses = Array.isArray(customer?.addresses) ? customer.addresses : [];
+  const primaryAddress =
+    addresses.find((address) => address?.isDefault) || addresses[0] || {};
+  const cityCountry = [primaryAddress?.city, primaryAddress?.country]
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(", ");
+
+  if (cityCountry) return cityCountry;
+
+  const fallbackPart = [primaryAddress?.state, primaryAddress?.street]
+    .map((part) => String(part || "").trim())
+    .find(Boolean);
+
+  return fallbackPart || "—";
+}
+
