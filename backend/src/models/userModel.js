@@ -139,6 +139,9 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+// add the index in user schema
+userSchema.index({ createdAt: 1 });
+
 /**
  * Virtual: Generates 2-letter uppercase initials from user name (e.g., "SL" for "Sophia Laurent")
  */

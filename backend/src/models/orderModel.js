@@ -170,6 +170,9 @@ const orderSchema = new mongoose.Schema(
   },
 );
 
+// create an index to make the aggrgation in other logic make optimize and good
+orderSchema.index({ createdAt: 1, status: 1 });
+
 /**
  * Virtual: id alias for orderNumber
  * Allows frontend to consume `order.id` (e.g. "#VO-8921") seamlessly.
