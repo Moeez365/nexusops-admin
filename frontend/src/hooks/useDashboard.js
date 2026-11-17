@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getStoreAnalytics } from "../api/settings";
 import { getOrders } from "../api/orders";
+import { getAnalyticsData } from "../api/analytics";
 
 /**
  * Custom hook encapsulating Dashboard analytics and recent orders fetching
@@ -18,10 +19,9 @@ export function useDashboard(initialRange = "7 days") {
 
     try {
       const [analyticsRes, ordersRes] = await Promise.allSettled([
-        getStoreAnalytics({ range: activeRange }),
+        getAnalyticsData({ range: activeRange }),
         getOrders({ sortBy: "newest" }),
       ]);
-
       if (analyticsRes.status === "fulfilled" && analyticsRes.value?.data) {
         setAnalyticsData(analyticsRes.value.data);
       }
@@ -63,7 +63,6 @@ export function useDashboard(initialRange = "7 days") {
             status: order.status || "Pending",
           };
         });
-
         setRecentOrders(mapped);
       }
     } catch (err) {
