@@ -2,9 +2,7 @@ import StoreSettings from "../models/storeSettingsModel.js";
 import Order from "../models/orderModel.js";
 import Product from "../models/productModel.js";
 
-/**
- * Mask sensitive credentials before returning to client
- */
+// Mask sensitive credentials before returning to client
 export const sanitizeSettings = (settingsDoc) => {
   const obj = settingsDoc.toObject ? settingsDoc.toObject() : JSON.parse(JSON.stringify(settingsDoc));
 
@@ -25,52 +23,45 @@ export const sanitizeSettings = (settingsDoc) => {
   return obj;
 };
 
-/**
- * Retrieve store settings with summary cards and formatted transit nodes
- */
+// Retrieve store settings
 export const fetchStoreSettings = async () => {
   const settings = await StoreSettings.getSettings();
   const sanitized = sanitizeSettings(settings);
 
-  const summaryCards = [
-    {
-      label: "Store status",
-      value: sanitized.storeProfile?.storeStatus || "Live",
-      icon: "storefront",
-    },
-    {
-      label: "Payments",
-      value: sanitized.payments?.escrowStatus || "Verified",
-      icon: "payments",
-    },
-    {
-      label: "Shipping zones",
-      value: `${sanitized.fulfillment?.shippingZones?.length || 4} zones`,
-      icon: "local_shipping",
-    },
-    {
-      label: "Team access",
-      value: `${sanitized.securityAndAlerts?.staffUsersCount || 8} users`,
-      icon: "group",
-    },
-  ];
-
-  const transitNodes = (sanitized.fulfillment?.transitNodes || []).map((node) => [
-    node.name,
-    node.detail || `${node.activeDispatches || 0} active dispatches`,
-    node.statusColor || "bg-primary",
-  ]);
-
   return {
     settings: sanitized,
-    summaryCards,
-    transitNodes,
+    ...sanitized,
+    summaryCards: [
+      {
+        label: "Store status",
+        value: sanitized.storeProfile?.storeStatus || "Live",
+        icon: "storefront",
+      },
+      {
+        label: "Payments",
+        value: sanitized.payments?.escrowStatus || "Verified",
+        icon: "payments",
+      },
+      {
+        label: "Shipping zones",
+        value: `${sanitized.fulfillment?.shippingZones?.length || 0} zones`,
+        icon: "local_shipping",
+      },
+      {
+        label: "Team access",
+        value: `${sanitized.securityAndAlerts?.staffUsersCount || 1} users`,
+        icon: "group",
+      },
+    ],
+    transitNodes: (sanitized.fulfillment?.transitNodes || []).map((node) => [
+      node.name,
+      node.detail || `${node.activeDispatches || 0} active dispatches`,
+      node.statusColor || "bg-primary",
+    ]),
   };
 };
 
-/**
- * Update nested sections of store settings
- */
+// Update store settings - accepts partial diff or full settings
 export const updateStoreSettingsData = async (updates = {}) => {
   const settings = await StoreSettings.getSettings();
 
@@ -78,6 +69,10 @@ export const updateStoreSettingsData = async (updates = {}) => {
     settings.storeProfile = {
       ...settings.storeProfile.toObject(),
       ...updates.storeProfile,
+      address: {
+        ...settings.storeProfile.address?.toObject(),
+        ...(updates.storeProfile.address || {}),
+      },
     };
   }
 
@@ -85,34 +80,48 @@ export const updateStoreSettingsData = async (updates = {}) => {
     settings.commerce = {
       ...settings.commerce.toObject(),
       ...updates.commerce,
+      defaultTaxRate: Number(updates.commerce.defaultTaxRate) || 0,
+      defaultShippingFee: Number(updates.commerce.defaultShippingFee) || 0,
+      freeShippingThreshold: Number(updates.commerce.freeShippingThreshold) || 0,
+      lowStockAlertThreshold: Number(updates.commerce.lowStockAlertThreshold) || 1,
     };
   }
 
   if (updates.payments) {
+    const currentPayments = settings.payments.toObject();
+    const currentGateways = currentPayments.gateways || {};
     const incomingGateways = updates.payments.gateways || {};
-    const currentGateways = settings.payments.gateways || {};
 
-    if (incomingGateways.stripe) {
-      if (!incomingGateways.stripe.secretKey || incomingGateways.stripe.secretKey.includes("••")) {
-        incomingGateways.stripe.secretKey = currentGateways.stripe?.secretKey || "";
-      }
-      if (!incomingGateways.stripe.webhookSecret || incomingGateways.stripe.webhookSecret.includes("••")) {
-        incomingGateways.stripe.webhookSecret = currentGateways.stripe?.webhookSecret || "";
-      }
-    }
+    const preserveSecret = (incoming, existing) => {
+      if (!incoming || incoming.includes("••")) return existing || "";
+      return incoming;
+    };
 
-    if (incomingGateways.paypal) {
-      if (!incomingGateways.paypal.clientSecret || incomingGateways.paypal.clientSecret.includes("••")) {
-        incomingGateways.paypal.clientSecret = currentGateways.paypal?.clientSecret || "";
-      }
-    }
+    const stripe = incomingGateways.stripe
+      ? {
+          ...currentGateways.stripe,
+          ...incomingGateways.stripe,
+          secretKey: preserveSecret(incomingGateways.stripe.secretKey, currentGateways.stripe?.secretKey),
+          webhookSecret: preserveSecret(incomingGateways.stripe.webhookSecret, currentGateways.stripe?.webhookSecret),
+        }
+      : currentGateways.stripe;
+
+    const paypal = incomingGateways.paypal
+      ? {
+          ...currentGateways.paypal,
+          ...incomingGateways.paypal,
+          clientSecret: preserveSecret(incomingGateways.paypal.clientSecret, currentGateways.paypal?.clientSecret),
+        }
+      : currentGateways.paypal;
 
     settings.payments = {
-      ...settings.payments.toObject(),
+      ...currentPayments,
       ...updates.payments,
       gateways: {
-        ...(currentGateways.toObject?.() || currentGateways),
+        ...currentGateways,
         ...incomingGateways,
+        stripe,
+        paypal,
       },
     };
   }
@@ -128,6 +137,7 @@ export const updateStoreSettingsData = async (updates = {}) => {
     settings.securityAndAlerts = {
       ...settings.securityAndAlerts.toObject(),
       ...updates.securityAndAlerts,
+      staffUsersCount: Number(updates.securityAndAlerts.staffUsersCount) || 1,
     };
   }
 
@@ -135,6 +145,10 @@ export const updateStoreSettingsData = async (updates = {}) => {
     settings.analyticsDefaults = {
       ...settings.analyticsDefaults.toObject(),
       ...updates.analyticsDefaults,
+      targets: {
+        ...settings.analyticsDefaults.targets?.toObject(),
+        ...(updates.analyticsDefaults.targets || {}),
+      },
     };
   }
 
@@ -142,9 +156,7 @@ export const updateStoreSettingsData = async (updates = {}) => {
   return sanitizeSettings(settings);
 };
 
-/**
- * Compute store telemetry, KPI actuals, and category share
- */
+// Compute store analytics for intelligence dashboard
 export const computeStoreAnalytics = async (requestedRange) => {
   const settings = await StoreSettings.getSettings();
   const analyticsDefaults = settings.analyticsDefaults || {};
@@ -181,35 +193,35 @@ export const computeStoreAnalytics = async (requestedRange) => {
   const kpiCards = [
     {
       label: "Total revenue",
-      value: `$${(liveRevenue || 128450).toLocaleString()}`,
+      value: `$${(liveRevenue || 0).toLocaleString()}`,
       change: "14.2%",
       period: "vs last week",
       icon: "payments",
-      numericValue: liveRevenue || 128450,
+      numericValue: liveRevenue || 0,
     },
     {
       label: "Order volume",
-      value: (totalOrders || 1420).toLocaleString(),
+      value: (totalOrders || 0).toLocaleString(),
       change: "8.5%",
-      period: `${completedOrders || 1420} completed`,
+      period: `${completedOrders || 0} completed`,
       icon: "shopping_bag",
-      numericValue: totalOrders || 1420,
+      numericValue: totalOrders || 0,
     },
     {
       label: "Active customers",
-      value: (liveCustomerCount || 3890).toLocaleString(),
+      value: (liveCustomerCount || 0).toLocaleString(),
       change: "12.1%",
       period: "registered",
       icon: "group",
-      numericValue: liveCustomerCount || 3890,
+      numericValue: liveCustomerCount || 0,
     },
     {
       label: "Average order",
-      value: `$${liveAvgOrderValue > 0 ? liveAvgOrderValue : "90.45"}`,
+      value: `$${liveAvgOrderValue > 0 ? liveAvgOrderValue : "0.00"}`,
       change: "3.8%",
       period: "per cart",
       icon: "monitoring",
-      numericValue: Number(liveAvgOrderValue) || 90.45,
+      numericValue: Number(liveAvgOrderValue) || 0,
     },
   ];
 
@@ -227,21 +239,14 @@ export const computeStoreAnalytics = async (requestedRange) => {
     timeRange,
     kpiCards,
     revenueBars,
-    categoryShare: categoryShare.length > 0 ? categoryShare : [
-      { name: "Haute Horlogerie", revenue: "$58,400", share: 45, orders: 412 },
-      { name: "Fine Jewelry & Solitaires", revenue: "$39,120", share: 30, orders: 518 },
-      { name: "Atelier Leather Goods", revenue: "$20,540", share: 16, orders: 310 },
-      { name: "Bespoke Accessories", revenue: "$10,390", share: 9, orders: 180 },
-    ],
+    categoryShare,
     conversionFunnel: analyticsDefaults.conversionFunnelBaseline || [],
     regionalDemand: analyticsDefaults.regionalDemandTargets || [],
     targets: analyticsDefaults.targets || {},
   };
 };
 
-/**
- * Update analytics targets
- */
+// Update analytics targets
 export const updateStoreAnalyticsTargets = async (payload = {}) => {
   const settings = await StoreSettings.getSettings();
 
@@ -265,9 +270,7 @@ export const updateStoreAnalyticsTargets = async (payload = {}) => {
   return settings.analyticsDefaults;
 };
 
-/**
- * Public payment gateway configs for frontend checkout/store
- */
+// Public payment gateway configs for frontend checkout/store
 export const fetchPublicPaymentConfig = async () => {
   const settings = await StoreSettings.getSettings();
   const payments = settings.payments || {};
@@ -314,76 +317,20 @@ export const fetchPublicPaymentConfig = async () => {
   };
 };
 
-/**
- * Update payment configuration
- */
+// Update payment configuration
 export const updatePaymentGatewaysConfig = async ({ defaultMethod, escrowStatus, gateways } = {}) => {
-  const settings = await StoreSettings.getSettings();
-
-  if (defaultMethod) settings.payments.defaultMethod = defaultMethod;
-  if (escrowStatus) settings.payments.escrowStatus = escrowStatus;
-
-  if (gateways) {
-    const current = settings.payments.gateways || {};
-
-    if (gateways.stripe) {
-      settings.payments.gateways.stripe = {
-        ...(current.stripe.toObject?.() || current.stripe),
-        ...gateways.stripe,
-        secretKey:
-          gateways.stripe.secretKey && !gateways.stripe.secretKey.includes("••")
-            ? gateways.stripe.secretKey
-            : current.stripe?.secretKey,
-        webhookSecret:
-          gateways.stripe.webhookSecret && !gateways.stripe.webhookSecret.includes("••")
-            ? gateways.stripe.webhookSecret
-            : current.stripe?.webhookSecret,
-      };
-    }
-
-    if (gateways.paypal) {
-      settings.payments.gateways.paypal = {
-        ...(current.paypal.toObject?.() || current.paypal),
-        ...gateways.paypal,
-        clientSecret:
-          gateways.paypal.clientSecret && !gateways.paypal.clientSecret.includes("••")
-            ? gateways.paypal.clientSecret
-            : current.paypal?.clientSecret,
-      };
-    }
-
-    if (gateways.bankTransfer) {
-      settings.payments.gateways.bankTransfer = {
-        ...(current.bankTransfer.toObject?.() || current.bankTransfer),
-        ...gateways.bankTransfer,
-      };
-    }
-
-    if (gateways.cashOnDelivery) {
-      settings.payments.gateways.cashOnDelivery = {
-        ...(current.cashOnDelivery.toObject?.() || current.cashOnDelivery),
-        ...gateways.cashOnDelivery,
-      };
-    }
-
-    if (gateways.cryptoEscrow) {
-      settings.payments.gateways.cryptoEscrow = {
-        ...(current.cryptoEscrow.toObject?.() || current.cryptoEscrow),
-        ...gateways.cryptoEscrow,
-      };
-    }
-  }
-
-  await settings.save();
-  return sanitizeSettings(settings).payments;
+  return updateStoreSettingsData({
+    payments: {
+      defaultMethod,
+      escrowStatus,
+      gateways,
+    },
+  });
 };
 
-/**
- * Reset settings to initial factory defaults
- */
+// Reset settings to initial factory defaults
 export const resetStoreSettingsToDefaults = async () => {
   await StoreSettings.deleteOne({ singletonId: "STORE_CONFIG_PRIMARY" });
   const freshSettings = await StoreSettings.getSettings();
   return sanitizeSettings(freshSettings);
 };
-

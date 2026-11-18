@@ -757,7 +757,7 @@ function Dashboard() {
         title="Dashboard"
         buttonLabel="Create Order"
         buttonIcon="add"
-        buttonTo="/orders/new"
+        buttonTo="/orders/create-order"
         secondaryButtonLabel="Add Product"
         secondaryButtonIcon="add_shopping_cart"
         secondaryButtonTo="/inventory/add-product"
@@ -970,7 +970,7 @@ function Dashboard() {
                             Client transactions will show up here as soon as orders are placed.
                           </p>
                           <Link
-                            to="/orders/new"
+                            to="/orders/create-order"
                             className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 font-label-mono text-xs uppercase font-semibold text-on-primary shadow-sm hover:bg-primary/90"
                           >
                             <span className="material-symbols-outlined text-[14px]">add</span>

@@ -9,11 +9,7 @@ import {
   resetStoreSettingsToDefaults,
 } from "../services/settingsService.js";
 
-/**
- * @desc    Get complete store settings, default rules, and logistics nodes
- * @route   GET /api/settings
- * @access  Public / Admin
- */
+// Get complete store settings
 export const getStoreSettings = asyncHandler(async (req, res) => {
   const data = await fetchStoreSettings();
 
@@ -23,11 +19,7 @@ export const getStoreSettings = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * @desc    Update store settings (profile, commerce defaults, logistics, security)
- * @route   PUT /api/settings
- * @access  Admin
- */
+// Update store settings (accepts full or partial diff updates)
 export const updateStoreSettings = asyncHandler(async (req, res) => {
   const updatedSettings = await updateStoreSettingsData(req.body);
 
@@ -38,11 +30,7 @@ export const updateStoreSettings = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * @desc    Get store analytics (live database stats merged with targets & telemetry)
- * @route   GET /api/settings/analytics
- * @access  Public / Admin
- */
+// Get store analytics
 export const getStoreAnalytics = asyncHandler(async (req, res) => {
   const analyticsData = await computeStoreAnalytics(req.query.range);
 
@@ -52,11 +40,7 @@ export const getStoreAnalytics = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * @desc    Update analytics baseline targets
- * @route   PUT /api/settings/analytics
- * @access  Admin
- */
+// Update analytics baseline targets
 export const updateAnalyticsTargets = asyncHandler(async (req, res) => {
   const updatedDefaults = await updateStoreAnalyticsTargets(req.body);
 
@@ -67,11 +51,7 @@ export const updateAnalyticsTargets = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * @desc    Get safe public payment configuration for checkout & store
- * @route   GET /api/settings/payment
- * @access  Public
- */
+// Get public payment configuration
 export const getPaymentConfig = asyncHandler(async (req, res) => {
   const config = await fetchPublicPaymentConfig();
 
@@ -81,11 +61,7 @@ export const getPaymentConfig = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * @desc    Update payment gateways and escrow settings
- * @route   PUT /api/settings/payment
- * @access  Admin
- */
+// Update payment gateways
 export const updatePaymentConfig = asyncHandler(async (req, res) => {
   const updatedPayments = await updatePaymentGatewaysConfig(req.body);
 
@@ -96,11 +72,7 @@ export const updatePaymentConfig = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * @desc    Reset store settings to factory defaults
- * @route   POST /api/settings/reset
- * @access  Admin
- */
+// Reset store settings to factory defaults
 export const resetDefaultSettings = asyncHandler(async (req, res) => {
   const defaultSettings = await resetStoreSettingsToDefaults();
 

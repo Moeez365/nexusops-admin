@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import PropTypes from "prop-types";
 import PageHeader from "../components/PageHeader";
@@ -104,21 +104,8 @@ const TABS = [
   { id: "analytics", label: "Analytics Targets", icon: "monitoring" },
 ];
 
-function Settings() {
-  const [activeTab, setActiveTab] = useState("profile");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const [notification, setNotification] = useState(null);
-
-  // Modals
-  const [showResetModal, setShowResetModal] = useState(false);
-  const [showAddZoneModal, setShowAddZoneModal] = useState(false);
-  const [showAddCurrencyModal, setShowAddCurrencyModal] = useState(false);
-  const [showAddNodeModal, setShowAddNodeModal] = useState(false);
-
-  // 1. Store Profile
-  const [storeProfile, setStoreProfile] = useState({
+const DEFAULT_SETTINGS = {
+  storeProfile: {
     storeName: "NexaOps Store",
     tagline: "Haute Horlogerie & Bespoke Atelier",
     supportEmail: "support@nexaops.store",
@@ -134,10 +121,8 @@ function Settings() {
       postalCode: "75001",
       country: "France",
     },
-  });
-
-  // 2. Commerce
-  const [commerce, setCommerce] = useState({
+  },
+  commerce: {
     defaultCurrency: "EUR",
     currencySymbol: "€",
     taxMode: "VAT included",
@@ -153,132 +138,100 @@ function Settings() {
       { code: "AED", symbol: "AED", name: "UAE Dirham", exchangeRate: 3.97, isActive: true },
       { code: "GBP", symbol: "£", name: "British Pound", exchangeRate: 0.85, isActive: true },
     ],
-  });
-
-  // 3. Payments
-  const [payments, setPayments] = useState({
+  },
+  payments: {
     defaultMethod: "Credit Card",
     escrowStatus: "Verified",
     gateways: {
       stripe: {
         enabled: true,
         testMode: true,
-        publishableKey: "pk_test_sample_nexaops",
+        publishableKey: "",
         secretKey: "",
         webhookSecret: "",
       },
       paypal: {
         enabled: true,
         mode: "sandbox",
-        clientId: "sb_client_nexaops",
+        clientId: "",
         clientSecret: "",
       },
       bankTransfer: {
         enabled: true,
-        bankName: "Banque Privée Edmond de Rothschild",
-        iban: "FR76 3000 4000 1234 5678 9012 345",
-        bic: "ROTHFR2PXXX",
-        instructions: "Please include your Order ID in the transfer reference for immediate atelier clearing.",
+        bankName: "",
+        iban: "",
+        bic: "",
+        instructions: "",
       },
       cashOnDelivery: {
         enabled: false,
-        maxAmount: 3000,
-        instructions: "Available only for metropolitan concierge delivery.",
+        maxAmount: 0,
+        instructions: "",
       },
       cryptoEscrow: {
         enabled: true,
         network: "Ethereum / USDT",
-        walletAddress: "0x71C...NexaOpsVault",
-        instructions: "Locked in smart escrow pending physical delivery inspection and valet sign-off.",
+        walletAddress: "",
+        instructions: "",
       },
     },
-  });
-
-  // 4. Fulfillment
-  const [fulfillment, setFulfillment] = useState({
+  },
+  fulfillment: {
     securityReviewRequired: true,
-    ordersNeedingIdentityReview: 3,
-    shippingZones: [
-      {
-        id: "zone-1",
-        name: "Western Europe Atelier Priority",
-        regions: ["France", "Switzerland", "Monaco", "Italy", "Germany", "United Kingdom"],
-        rate: 0,
-        freeThreshold: 1000,
-        estimatedDays: "1-2 business days",
-        isActive: true,
-      },
-      {
-        id: "zone-2",
-        name: "North America Armored Courier",
-        regions: ["United States", "Canada"],
-        rate: 150,
-        freeThreshold: 2500,
-        estimatedDays: "2-3 business days",
-        isActive: true,
-      },
-      {
-        id: "zone-3",
-        name: "Middle East & GCC Valet",
-        regions: ["United Arab Emirates", "Saudi Arabia", "Qatar"],
-        rate: 200,
-        freeThreshold: 3000,
-        estimatedDays: "2-4 business days",
-        isActive: true,
-      },
-      {
-        id: "zone-4",
-        name: "Asia-Pacific Diplomatic Express",
-        regions: ["Japan", "Singapore", "Hong Kong"],
-        rate: 250,
-        freeThreshold: 3500,
-        estimatedDays: "3-5 business days",
-        isActive: true,
-      },
-    ],
-    transitNodes: [
-      {
-        name: "Geneva Operations Hub",
-        detail: "4 active dispatches",
-        statusColor: "bg-primary",
-        activeDispatches: 4,
-      },
-      {
-        name: "Paris Atelier Couriers",
-        detail: "12 active valets",
-        statusColor: "bg-primary",
-        activeDispatches: 12,
-      },
-      {
-        name: "Dubai Customs Gate",
-        detail: "1 clearance pending",
-        statusColor: "bg-rose-500",
-        activeDispatches: 1,
-      },
-    ],
-  });
-
-  // 5. Security & Alerts
-  const [securityAndAlerts, setSecurityAndAlerts] = useState({
+    ordersNeedingIdentityReview: 0,
+    shippingZones: [],
+    transitNodes: [],
+  },
+  securityAndAlerts: {
     orderAlerts: true,
     lowStockAlerts: true,
     requireTwoFactor: false,
-    staffUsersCount: 8,
+    staffUsersCount: 1,
     syncStatus: "NexaOps synced",
-  });
-
-  // 6. Analytics Defaults
-  const [analyticsDefaults, setAnalyticsDefaults] = useState({
+  },
+  analyticsDefaults: {
     defaultTimeRange: "7D",
     targets: {
-      monthlyRevenueTarget: 150000,
-      orderVolumeTarget: 1500,
-      activeCustomersTarget: 4000,
-      avgOrderValueTarget: 120,
+      monthlyRevenueTarget: 0,
+      orderVolumeTarget: 0,
+      activeCustomersTarget: 0,
+      avgOrderValueTarget: 0,
     },
-  });
+  },
+};
 
-  // New Zone Form State
+// Calculate changed sections to only send modified data to the backend
+const getChangedSettings = (current, baseline) => {
+  if (!baseline) return current;
+  const changed = {};
+
+  for (const section of Object.keys(current)) {
+    if (JSON.stringify(current[section]) !== JSON.stringify(baseline[section])) {
+      changed[section] = current[section];
+    }
+  }
+
+  return changed;
+};
+
+function Settings() {
+  const [activeTab, setActiveTab] = useState("profile");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [notification, setNotification] = useState(null);
+
+  // Unified settings state and baseline for diff tracking
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [initialSettings, setInitialSettings] = useState(null);
+
+  // Modals
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [showAddZoneModal, setShowAddZoneModal] = useState(false);
+  const [showAddCurrencyModal, setShowAddCurrencyModal] = useState(false);
+  const [showAddNodeModal, setShowAddNodeModal] = useState(false);
+
+  // Modal form states
   const [newZone, setNewZone] = useState({
     name: "",
     regions: "",
@@ -287,7 +240,6 @@ function Settings() {
     estimatedDays: "2-4 business days",
   });
 
-  // New Currency Form State
   const [newCurrency, setNewCurrency] = useState({
     code: "",
     symbol: "",
@@ -295,7 +247,6 @@ function Settings() {
     exchangeRate: 1.0,
   });
 
-  // New Transit Node Form State
   const [newNode, setNewNode] = useState({
     name: "",
     detail: "Active dispatch",
@@ -303,56 +254,51 @@ function Settings() {
     activeDispatches: 1,
   });
 
-  // Helper to apply loaded database settings
-  const applyLoadedSettings = (data) => {
-    if (data.storeProfile) {
-      setStoreProfile((prev) => ({
-        ...prev,
-        ...data.storeProfile,
-        address: { ...prev.address, ...(data.storeProfile.address || {}) },
-      }));
-    }
-    if (data.commerce) {
-      setCommerce((prev) => ({
-        ...prev,
-        ...data.commerce,
-        supportedCurrencies: data.commerce.supportedCurrencies || prev.supportedCurrencies,
-      }));
-    }
-    if (data.payments) {
-      setPayments((prev) => ({
-        ...prev,
-        ...data.payments,
+  // Apply loaded database settings and store baseline
+  const applyLoadedSettings = (raw) => {
+    if (!raw) return;
+    const data = raw.settings || raw;
+
+    const merged = {
+      storeProfile: { ...DEFAULT_SETTINGS.storeProfile, ...(data.storeProfile || {}) },
+      commerce: {
+        ...DEFAULT_SETTINGS.commerce,
+        ...(data.commerce || {}),
+        supportedCurrencies: data.commerce?.supportedCurrencies || DEFAULT_SETTINGS.commerce.supportedCurrencies,
+      },
+      payments: {
+        ...DEFAULT_SETTINGS.payments,
+        ...(data.payments || {}),
         gateways: {
-          ...prev.gateways,
-          ...(data.payments.gateways || {}),
+          ...DEFAULT_SETTINGS.payments.gateways,
+          ...(data.payments?.gateways || {}),
         },
-      }));
-    }
-    if (data.fulfillment) {
-      setFulfillment((prev) => ({
-        ...prev,
-        ...data.fulfillment,
-        shippingZones: data.fulfillment.shippingZones || prev.shippingZones,
-        transitNodes: data.fulfillment.transitNodes || prev.transitNodes,
-      }));
-    }
-    if (data.securityAndAlerts) {
-      setSecurityAndAlerts((prev) => ({
-        ...prev,
-        ...data.securityAndAlerts,
-      }));
-    }
-    if (data.analyticsDefaults) {
-      setAnalyticsDefaults((prev) => ({
-        ...prev,
-        ...data.analyticsDefaults,
-        targets: { ...prev.targets, ...(data.analyticsDefaults.targets || {}) },
-      }));
-    }
+      },
+      fulfillment: {
+        ...DEFAULT_SETTINGS.fulfillment,
+        ...(data.fulfillment || {}),
+        shippingZones: data.fulfillment?.shippingZones || [],
+        transitNodes: data.fulfillment?.transitNodes || [],
+      },
+      securityAndAlerts: {
+        ...DEFAULT_SETTINGS.securityAndAlerts,
+        ...(data.securityAndAlerts || {}),
+      },
+      analyticsDefaults: {
+        ...DEFAULT_SETTINGS.analyticsDefaults,
+        ...(data.analyticsDefaults || {}),
+        targets: {
+          ...DEFAULT_SETTINGS.analyticsDefaults.targets,
+          ...(data.analyticsDefaults?.targets || {}),
+        },
+      },
+    };
+
+    setSettings(merged);
+    setInitialSettings(JSON.parse(JSON.stringify(merged)));
   };
 
-  // Load store settings from backend on mount
+  // Load store settings on mount
   useEffect(() => {
     let ignore = false;
     async function load() {
@@ -374,52 +320,100 @@ function Settings() {
     };
   }, []);
 
-  // Save all settings to backend
+  // Update helpers for clean state changes
+  const updateField = (section, field, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateAddress = (field, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      storeProfile: {
+        ...prev.storeProfile,
+        address: {
+          ...prev.storeProfile?.address,
+          [field]: value,
+        },
+      },
+    }));
+  };
+
+  const updateGateway = (gateway, updates) => {
+    setSettings((prev) => ({
+      ...prev,
+      payments: {
+        ...prev.payments,
+        gateways: {
+          ...prev.payments?.gateways,
+          [gateway]: {
+            ...prev.payments?.gateways?.[gateway],
+            ...updates,
+          },
+        },
+      },
+    }));
+  };
+
+  const updateTarget = (target, value) => {
+    setSettings((prev) => ({
+      ...prev,
+      analyticsDefaults: {
+        ...prev.analyticsDefaults,
+        targets: {
+          ...prev.analyticsDefaults?.targets,
+          [target]: Number(value) || 0,
+        },
+      },
+    }));
+  };
+
+  // Compute diff of changed sections
+  const changedSettings = useMemo(() => {
+    return getChangedSettings(settings, initialSettings);
+  }, [settings, initialSettings]);
+
+  const changedSections = Object.keys(changedSettings);
+  const hasChanges = changedSections.length > 0;
+
+  // Save only changed sections to backend
   const handleSave = async () => {
+    if (!hasChanges) {
+      setNotification({
+        type: "info",
+        message: "No changes detected. Everything is already up to date.",
+      });
+      return;
+    }
+
     try {
       setSaving(true);
       setNotification(null);
 
-      const payload = {
-        storeProfile,
-        commerce: {
-          ...commerce,
-          defaultTaxRate: Number(commerce.defaultTaxRate) || 0,
-          defaultShippingFee: Number(commerce.defaultShippingFee) || 0,
-          freeShippingThreshold: Number(commerce.freeShippingThreshold) || 0,
-          lowStockAlertThreshold: Number(commerce.lowStockAlertThreshold) || 1,
-        },
-        payments,
-        fulfillment,
-        securityAndAlerts: {
-          ...securityAndAlerts,
-          staffUsersCount: Number(securityAndAlerts.staffUsersCount) || 1,
-        },
-        analyticsDefaults,
-      };
-
-      const res = await updateStoreSettings(payload);
+      const res = await updateStoreSettings(changedSettings);
       if (res?.success) {
+        applyLoadedSettings(res.data);
         setNotification({
           type: "success",
-          message: "All settings, commerce rules, gateways, and fulfillment saved to database successfully.",
+          message: `Saved ${changedSections.length} modified section${changedSections.length > 1 ? "s" : ""} to database.`,
         });
-        if (res.data) {
-          applyLoadedSettings(res.data);
-        }
       }
     } catch (err) {
-      console.error("Failed to save settings:", err);
       setNotification({
         type: "error",
-        message: err?.response?.data?.message || "Failed to save settings to server.",
+        message: err?.response?.data?.message || "Failed to save settings.",
       });
     } finally {
       setSaving(false);
     }
   };
 
-  // Reset settings to factory defaults
+  // Factory reset
   const handleResetDefaults = async () => {
     try {
       setResetting(true);
@@ -434,7 +428,6 @@ function Settings() {
         });
       }
     } catch (err) {
-      console.error("Failed to reset settings:", err);
       setNotification({
         type: "error",
         message: err?.response?.data?.message || "Failed to reset settings.",
@@ -444,28 +437,29 @@ function Settings() {
     }
   };
 
-  // Add a new shipping zone
+  // Add and remove shipping zones
   const handleAddZone = (e) => {
     e.preventDefault();
     if (!newZone.name.trim()) return;
 
-    const regionsList = newZone.regions
-      ? newZone.regions.split(",").map((r) => r.trim()).filter(Boolean)
-      : [];
-
     const zoneToAdd = {
       id: `zone-${Date.now()}`,
       name: newZone.name.trim(),
-      regions: regionsList,
+      regions: newZone.regions
+        ? newZone.regions.split(",").map((r) => r.trim()).filter(Boolean)
+        : [],
       rate: Number(newZone.rate) || 0,
       freeThreshold: Number(newZone.freeThreshold) || 0,
-      estimatedDays: newZone.estimatedDays || "2-4 business days",
+      estimatedDays: newZone.estimatedDays.trim() || "2-4 business days",
       isActive: true,
     };
 
-    setFulfillment((prev) => ({
+    setSettings((prev) => ({
       ...prev,
-      shippingZones: [...prev.shippingZones, zoneToAdd],
+      fulfillment: {
+        ...prev.fulfillment,
+        shippingZones: [...prev.fulfillment.shippingZones, zoneToAdd],
+      },
     }));
 
     setNewZone({
@@ -476,21 +470,31 @@ function Settings() {
       estimatedDays: "2-4 business days",
     });
     setShowAddZoneModal(false);
-    setNotification({
-      type: "success",
-      message: `Shipping zone "${zoneToAdd.name}" added. Click "Save All Changes" to persist.`,
-    });
   };
 
-  // Remove a shipping zone
-  const handleRemoveZone = (id) => {
-    setFulfillment((prev) => ({
+  const handleToggleZone = (id) => {
+    setSettings((prev) => ({
       ...prev,
-      shippingZones: prev.shippingZones.filter((z) => z.id !== id && z._id !== id),
+      fulfillment: {
+        ...prev.fulfillment,
+        shippingZones: prev.fulfillment.shippingZones.map((z) =>
+          z.id === id ? { ...z, isActive: !z.isActive } : z
+        ),
+      },
     }));
   };
 
-  // Add a new currency
+  const handleRemoveZone = (id) => {
+    setSettings((prev) => ({
+      ...prev,
+      fulfillment: {
+        ...prev.fulfillment,
+        shippingZones: prev.fulfillment.shippingZones.filter((z) => z.id !== id),
+      },
+    }));
+  };
+
+  // Add and remove currencies
   const handleAddCurrency = (e) => {
     e.preventDefault();
     if (!newCurrency.code.trim()) return;
@@ -503,49 +507,49 @@ function Settings() {
       isActive: true,
     };
 
-    setCommerce((prev) => ({
+    setSettings((prev) => ({
       ...prev,
-      supportedCurrencies: [...prev.supportedCurrencies, currToAdd],
+      commerce: {
+        ...prev.commerce,
+        supportedCurrencies: [
+          ...prev.commerce.supportedCurrencies.filter((c) => c.code !== currToAdd.code),
+          currToAdd,
+        ],
+      },
     }));
 
     setNewCurrency({ code: "", symbol: "", name: "", exchangeRate: 1.0 });
     setShowAddCurrencyModal(false);
-    setNotification({
-      type: "success",
-      message: `Currency "${currToAdd.code}" added. Click "Save All Changes" to persist.`,
-    });
   };
 
-  // Remove a supported currency
   const handleRemoveCurrency = (code) => {
-    if (code === commerce.defaultCurrency) {
-      setNotification({
-        type: "error",
-        message: "Cannot remove the store's default currency.",
-      });
-      return;
-    }
-    setCommerce((prev) => ({
+    setSettings((prev) => ({
       ...prev,
-      supportedCurrencies: prev.supportedCurrencies.filter((c) => c.code !== code),
+      commerce: {
+        ...prev.commerce,
+        supportedCurrencies: prev.commerce.supportedCurrencies.filter((c) => c.code !== code),
+      },
     }));
   };
 
-  // Add transit node
+  // Add and remove transit nodes
   const handleAddNode = (e) => {
     e.preventDefault();
     if (!newNode.name.trim()) return;
 
     const nodeToAdd = {
       name: newNode.name.trim(),
-      detail: newNode.detail.trim(),
-      statusColor: newNode.statusColor,
+      detail: newNode.detail.trim() || "Active dispatch",
+      statusColor: newNode.statusColor || "bg-primary",
       activeDispatches: Number(newNode.activeDispatches) || 0,
     };
 
-    setFulfillment((prev) => ({
+    setSettings((prev) => ({
       ...prev,
-      transitNodes: [...prev.transitNodes, nodeToAdd],
+      fulfillment: {
+        ...prev.fulfillment,
+        transitNodes: [...prev.fulfillment.transitNodes, nodeToAdd],
+      },
     }));
 
     setNewNode({
@@ -555,49 +559,46 @@ function Settings() {
       activeDispatches: 1,
     });
     setShowAddNodeModal(false);
-    setNotification({
-      type: "success",
-      message: `Transit node "${nodeToAdd.name}" added. Click "Save All Changes" to persist.`,
-    });
   };
 
-  // Remove transit node
   const handleRemoveNode = (name) => {
-    setFulfillment((prev) => ({
+    setSettings((prev) => ({
       ...prev,
-      transitNodes: prev.transitNodes.filter((n) => n.name !== name),
+      fulfillment: {
+        ...prev.fulfillment,
+        transitNodes: prev.fulfillment.transitNodes.filter((n) => n.name !== name),
+      },
     }));
   };
 
+  const {
+    storeProfile,
+    commerce,
+    payments,
+    fulfillment,
+    securityAndAlerts,
+    analyticsDefaults,
+  } = settings;
+
   // Dynamic KPI summary cards matching current state
   const summaryCards = [
-    {
-      label: "Store status",
-      value: storeProfile.storeStatus,
-      icon: "storefront",
-    },
-    {
-      label: "Payments",
-      value: payments.escrowStatus,
-      icon: "payments",
-    },
-    {
-      label: "Shipping zones",
-      value: `${fulfillment.shippingZones.length} zones`,
-      icon: "local_shipping",
-    },
-    {
-      label: "Team access",
-      value: `${securityAndAlerts.staffUsersCount} users`,
-      icon: "group",
-    },
+    { label: "Store status", value: storeProfile.storeStatus, icon: "storefront" },
+    { label: "Payments", value: payments.escrowStatus, icon: "payments" },
+    { label: "Shipping zones", value: `${fulfillment.shippingZones.length} zones`, icon: "local_shipping" },
+    { label: "Team access", value: `${securityAndAlerts.staffUsersCount} users`, icon: "group" },
   ];
 
   return (
     <>
       <PageHeader
         title="Settings"
-        buttonLabel={saving ? "Saving..." : "Save All Changes"}
+        buttonLabel={
+          saving
+            ? "Saving..."
+            : hasChanges
+            ? `Save Changes (${changedSections.length})`
+            : "Save Settings"
+        }
         buttonIcon={saving ? "sync" : "save"}
         buttonDisabled={saving || resetting}
         onButtonClick={handleSave}
@@ -625,10 +626,18 @@ function Settings() {
             <div className="flex items-center gap-2 font-label-mono text-[10px] uppercase tracking-widest text-on-surface-variant">
               <span
                 className={`h-2 w-2 rounded-full ${
-                  loading ? "bg-amber-500 animate-ping" : "bg-primary animate-pulse"
+                  loading
+                    ? "bg-amber-500 animate-ping"
+                    : hasChanges
+                    ? "bg-amber-500 animate-pulse"
+                    : "bg-primary animate-pulse"
                 }`}
               />
-              {loading ? "Syncing database..." : securityAndAlerts.syncStatus || "NexaOps synced"}
+              {loading
+                ? "Syncing database..."
+                : hasChanges
+                ? `${changedSections.length} unsaved change${changedSections.length > 1 ? "s" : ""}`
+                : securityAndAlerts.syncStatus || "NexaOps synced"}
             </div>
           </section>
 
@@ -638,22 +647,27 @@ function Settings() {
               className={`flex items-center justify-between gap-3 rounded-2xl border p-4 text-sm transition-all shadow-md backdrop-blur-md ${
                 notification.type === "error"
                   ? "bg-rose-500/10 text-rose-700 border-rose-500/30"
-                  : "bg-primary-container/90 text-on-primary-container border-primary/30"
+                  : notification.type === "info"
+                  ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
+                  : "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
               }`}
             >
               <div className="flex items-center gap-2.5">
                 <span className="material-symbols-outlined text-[20px]">
-                  {notification.type === "error" ? "error" : "check_circle"}
+                  {notification.type === "error"
+                    ? "error"
+                    : notification.type === "info"
+                    ? "info"
+                    : "check_circle"}
                 </span>
-                <span className="font-medium">{notification.message}</span>
+                <span>{notification.message}</span>
               </div>
               <button
                 type="button"
-                aria-label="Dismiss notification"
                 onClick={() => setNotification(null)}
-                className="cursor-pointer p-1 hover:opacity-75"
+                className="cursor-pointer text-xs font-semibold hover:opacity-75"
               >
-                <span className="material-symbols-outlined text-sm">close</span>
+                Dismiss
               </button>
             </div>
           )}
@@ -708,7 +722,7 @@ function Settings() {
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-12">
             <div className="space-y-8 xl:col-span-8">
 
-              {/* ── TAB 1: Store Profile ─────────────────────────────────────── */}
+              {/* TAB 1: Store Profile */}
               {activeTab === "profile" && (
                 <div className="space-y-6 animate-in fade-in">
                   <section className={cardClass}>
@@ -729,9 +743,7 @@ function Settings() {
                         <input
                           type="text"
                           value={storeProfile.storeName}
-                          onChange={(e) =>
-                            setStoreProfile({ ...storeProfile, storeName: e.target.value })
-                          }
+                          onChange={(e) => updateField("storeProfile", "storeName", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -740,9 +752,7 @@ function Settings() {
                         <input
                           type="text"
                           value={storeProfile.tagline}
-                          onChange={(e) =>
-                            setStoreProfile({ ...storeProfile, tagline: e.target.value })
-                          }
+                          onChange={(e) => updateField("storeProfile", "tagline", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -751,9 +761,7 @@ function Settings() {
                         <input
                           type="email"
                           value={storeProfile.supportEmail}
-                          onChange={(e) =>
-                            setStoreProfile({ ...storeProfile, supportEmail: e.target.value })
-                          }
+                          onChange={(e) => updateField("storeProfile", "supportEmail", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -762,9 +770,7 @@ function Settings() {
                         <input
                           type="tel"
                           value={storeProfile.supportPhone}
-                          onChange={(e) =>
-                            setStoreProfile({ ...storeProfile, supportPhone: e.target.value })
-                          }
+                          onChange={(e) => updateField("storeProfile", "supportPhone", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -772,9 +778,7 @@ function Settings() {
                       <Field label="Store status">
                         <select
                           value={storeProfile.storeStatus}
-                          onChange={(e) =>
-                            setStoreProfile({ ...storeProfile, storeStatus: e.target.value })
-                          }
+                          onChange={(e) => updateField("storeProfile", "storeStatus", e.target.value)}
                           className={inputClass}
                         >
                           <option value="Live">Live (Storefront Accessible)</option>
@@ -788,9 +792,7 @@ function Settings() {
                         <input
                           type="text"
                           value={storeProfile.brandBadge}
-                          onChange={(e) =>
-                            setStoreProfile({ ...storeProfile, brandBadge: e.target.value })
-                          }
+                          onChange={(e) => updateField("storeProfile", "brandBadge", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -798,9 +800,7 @@ function Settings() {
                       <Field label="Country">
                         <select
                           value={storeProfile.country}
-                          onChange={(e) =>
-                            setStoreProfile({ ...storeProfile, country: e.target.value })
-                          }
+                          onChange={(e) => updateField("storeProfile", "country", e.target.value)}
                           className={inputClass}
                         >
                           <option value="France">France</option>
@@ -816,9 +816,7 @@ function Settings() {
                       <Field label="Timezone">
                         <select
                           value={storeProfile.timezone}
-                          onChange={(e) =>
-                            setStoreProfile({ ...storeProfile, timezone: e.target.value })
-                          }
+                          onChange={(e) => updateField("storeProfile", "timezone", e.target.value)}
                           className={inputClass}
                         >
                           <option value="Europe/Paris">Europe/Paris (UTC+1)</option>
@@ -848,12 +846,7 @@ function Settings() {
                           <input
                             type="text"
                             value={storeProfile.address?.street || ""}
-                            onChange={(e) =>
-                              setStoreProfile({
-                                ...storeProfile,
-                                address: { ...storeProfile.address, street: e.target.value },
-                              })
-                            }
+                            onChange={(e) => updateAddress("street", e.target.value)}
                             className={inputClass}
                           />
                         </Field>
@@ -863,12 +856,7 @@ function Settings() {
                         <input
                           type="text"
                           value={storeProfile.address?.city || ""}
-                          onChange={(e) =>
-                            setStoreProfile({
-                              ...storeProfile,
-                              address: { ...storeProfile.address, city: e.target.value },
-                            })
-                          }
+                          onChange={(e) => updateAddress("city", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -877,12 +865,7 @@ function Settings() {
                         <input
                           type="text"
                           value={storeProfile.address?.state || ""}
-                          onChange={(e) =>
-                            setStoreProfile({
-                              ...storeProfile,
-                              address: { ...storeProfile.address, state: e.target.value },
-                            })
-                          }
+                          onChange={(e) => updateAddress("state", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -891,12 +874,7 @@ function Settings() {
                         <input
                           type="text"
                           value={storeProfile.address?.postalCode || ""}
-                          onChange={(e) =>
-                            setStoreProfile({
-                              ...storeProfile,
-                              address: { ...storeProfile.address, postalCode: e.target.value },
-                            })
-                          }
+                          onChange={(e) => updateAddress("postalCode", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -905,7 +883,7 @@ function Settings() {
                 </div>
               )}
 
-              {/* ── TAB 2: Commerce & Tax ───────────────────────────────────── */}
+              {/* TAB 2: Commerce & Tax */}
               {activeTab === "commerce" && (
                 <div className="space-y-6 animate-in fade-in">
                   <section className={cardClass}>
@@ -925,11 +903,14 @@ function Settings() {
                           onChange={(e) => {
                             const code = e.target.value;
                             const matched = commerce.supportedCurrencies.find((c) => c.code === code);
-                            setCommerce({
-                              ...commerce,
-                              defaultCurrency: code,
-                              currencySymbol: matched ? matched.symbol : "€",
-                            });
+                            setSettings((prev) => ({
+                              ...prev,
+                              commerce: {
+                                ...prev.commerce,
+                                defaultCurrency: code,
+                                currencySymbol: matched ? matched.symbol : "€",
+                              },
+                            }));
                           }}
                           className={inputClass}
                         >
@@ -945,9 +926,7 @@ function Settings() {
                         <input
                           type="text"
                           value={commerce.currencySymbol}
-                          onChange={(e) =>
-                            setCommerce({ ...commerce, currencySymbol: e.target.value })
-                          }
+                          onChange={(e) => updateField("commerce", "currencySymbol", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -955,9 +934,7 @@ function Settings() {
                       <Field label="Tax mode">
                         <select
                           value={commerce.taxMode}
-                          onChange={(e) =>
-                            setCommerce({ ...commerce, taxMode: e.target.value })
-                          }
+                          onChange={(e) => updateField("commerce", "taxMode", e.target.value)}
                           className={inputClass}
                         >
                           <option value="VAT included">VAT included (European standard)</option>
@@ -973,9 +950,7 @@ function Settings() {
                           max="100"
                           step="0.1"
                           value={commerce.defaultTaxRate}
-                          onChange={(e) =>
-                            setCommerce({ ...commerce, defaultTaxRate: e.target.value })
-                          }
+                          onChange={(e) => updateField("commerce", "defaultTaxRate", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -985,9 +960,7 @@ function Settings() {
                           type="number"
                           min="0"
                           value={commerce.freeShippingThreshold}
-                          onChange={(e) =>
-                            setCommerce({ ...commerce, freeShippingThreshold: e.target.value })
-                          }
+                          onChange={(e) => updateField("commerce", "freeShippingThreshold", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -997,9 +970,7 @@ function Settings() {
                           type="number"
                           min="0"
                           value={commerce.defaultShippingFee}
-                          onChange={(e) =>
-                            setCommerce({ ...commerce, defaultShippingFee: e.target.value })
-                          }
+                          onChange={(e) => updateField("commerce", "defaultShippingFee", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -1009,9 +980,7 @@ function Settings() {
                           type="number"
                           min="1"
                           value={commerce.lowStockAlertThreshold}
-                          onChange={(e) =>
-                            setCommerce({ ...commerce, lowStockAlertThreshold: e.target.value })
-                          }
+                          onChange={(e) => updateField("commerce", "lowStockAlertThreshold", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -1020,9 +989,7 @@ function Settings() {
                         <input
                           type="text"
                           value={commerce.orderPrefix}
-                          onChange={(e) =>
-                            setCommerce({ ...commerce, orderPrefix: e.target.value })
-                          }
+                          onChange={(e) => updateField("commerce", "orderPrefix", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -1033,9 +1000,7 @@ function Settings() {
                             title="Allow guest checkout"
                             detail="Let clients purchase without registration."
                             enabled={commerce.allowGuestCheckout}
-                            onChange={(val) =>
-                              setCommerce({ ...commerce, allowGuestCheckout: val })
-                            }
+                            onChange={(val) => updateField("commerce", "allowGuestCheckout", val)}
                           />
                         </div>
                       </div>
@@ -1120,7 +1085,7 @@ function Settings() {
                 </div>
               )}
 
-              {/* ── TAB 3: Payments & Escrow ─────────────────────────────────── */}
+              {/* TAB 3: Payments & Escrow */}
               {activeTab === "payments" && (
                 <div className="space-y-6 animate-in fade-in">
                   <section className={cardClass}>
@@ -1137,9 +1102,7 @@ function Settings() {
                       <Field label="Default payment method">
                         <select
                           value={payments.defaultMethod}
-                          onChange={(e) =>
-                            setPayments({ ...payments, defaultMethod: e.target.value })
-                          }
+                          onChange={(e) => updateField("payments", "defaultMethod", e.target.value)}
                           className={inputClass}
                         >
                           <option value="Credit Card">Credit Card (Stripe)</option>
@@ -1153,9 +1116,7 @@ function Settings() {
                       <Field label="Escrow verification status">
                         <select
                           value={payments.escrowStatus}
-                          onChange={(e) =>
-                            setPayments({ ...payments, escrowStatus: e.target.value })
-                          }
+                          onChange={(e) => updateField("payments", "escrowStatus", e.target.value)}
                           className={inputClass}
                         >
                           <option value="Verified">Verified &amp; Insured</option>
@@ -1166,7 +1127,7 @@ function Settings() {
                     </div>
                   </section>
 
-                  {/* Gateway 1: Stripe */}
+                  {/* Stripe Card */}
                   <section className={cardClass}>
                     <div className="flex items-center justify-between border-b border-outline-variant/40 pb-4">
                       <div className="flex items-center gap-3">
@@ -1188,16 +1149,7 @@ function Settings() {
                           type="checkbox"
                           checked={payments.gateways?.stripe?.testMode || false}
                           onChange={(e) =>
-                            setPayments({
-                              ...payments,
-                              gateways: {
-                                ...payments.gateways,
-                                stripe: {
-                                  ...payments.gateways?.stripe,
-                                  testMode: e.target.checked,
-                                },
-                              },
-                            })
+                            updateGateway("stripe", { testMode: e.target.checked })
                           }
                           className="h-4 w-4 rounded accent-primary cursor-pointer"
                         />
@@ -1206,15 +1158,8 @@ function Settings() {
                           role="switch"
                           aria-checked={payments.gateways?.stripe?.enabled}
                           onClick={() =>
-                            setPayments({
-                              ...payments,
-                              gateways: {
-                                ...payments.gateways,
-                                stripe: {
-                                  ...payments.gateways?.stripe,
-                                  enabled: !payments.gateways?.stripe?.enabled,
-                                },
-                              },
+                            updateGateway("stripe", {
+                              enabled: !payments.gateways?.stripe?.enabled,
                             })
                           }
                           className={`relative h-6 w-11 rounded-full p-0.5 transition-colors cursor-pointer ${
@@ -1236,16 +1181,7 @@ function Settings() {
                           type="text"
                           value={payments.gateways?.stripe?.publishableKey || ""}
                           onChange={(e) =>
-                            setPayments({
-                              ...payments,
-                              gateways: {
-                                ...payments.gateways,
-                                stripe: {
-                                  ...payments.gateways?.stripe,
-                                  publishableKey: e.target.value,
-                                },
-                              },
-                            })
+                            updateGateway("stripe", { publishableKey: e.target.value })
                           }
                           className={inputClass}
                           placeholder="pk_test_..."
@@ -1257,16 +1193,7 @@ function Settings() {
                           type="password"
                           value={payments.gateways?.stripe?.secretKey || ""}
                           onChange={(e) =>
-                            setPayments({
-                              ...payments,
-                              gateways: {
-                                ...payments.gateways,
-                                stripe: {
-                                  ...payments.gateways?.stripe,
-                                  secretKey: e.target.value,
-                                },
-                              },
-                            })
+                            updateGateway("stripe", { secretKey: e.target.value })
                           }
                           className={inputClass}
                           placeholder="sk_test_••••••••••••"
@@ -1275,7 +1202,7 @@ function Settings() {
                     </div>
                   </section>
 
-                  {/* Gateway 2: Bank Wire Transfer */}
+                  {/* Bank Wire Transfer Card */}
                   <section className={cardClass}>
                     <div className="flex items-center justify-between border-b border-outline-variant/40 pb-4">
                       <div className="flex items-center gap-3">
@@ -1294,15 +1221,8 @@ function Settings() {
                         role="switch"
                         aria-checked={payments.gateways?.bankTransfer?.enabled}
                         onClick={() =>
-                          setPayments({
-                            ...payments,
-                            gateways: {
-                              ...payments.gateways,
-                              bankTransfer: {
-                                ...payments.gateways?.bankTransfer,
-                                enabled: !payments.gateways?.bankTransfer?.enabled,
-                              },
-                            },
+                          updateGateway("bankTransfer", {
+                            enabled: !payments.gateways?.bankTransfer?.enabled,
                           })
                         }
                         className={`relative h-6 w-11 rounded-full p-0.5 transition-colors cursor-pointer ${
@@ -1323,16 +1243,7 @@ function Settings() {
                           type="text"
                           value={payments.gateways?.bankTransfer?.bankName || ""}
                           onChange={(e) =>
-                            setPayments({
-                              ...payments,
-                              gateways: {
-                                ...payments.gateways,
-                                bankTransfer: {
-                                  ...payments.gateways?.bankTransfer,
-                                  bankName: e.target.value,
-                                },
-                              },
-                            })
+                            updateGateway("bankTransfer", { bankName: e.target.value })
                           }
                           className={inputClass}
                         />
@@ -1343,16 +1254,7 @@ function Settings() {
                           type="text"
                           value={payments.gateways?.bankTransfer?.iban || ""}
                           onChange={(e) =>
-                            setPayments({
-                              ...payments,
-                              gateways: {
-                                ...payments.gateways,
-                                bankTransfer: {
-                                  ...payments.gateways?.bankTransfer,
-                                  iban: e.target.value,
-                                },
-                              },
-                            })
+                            updateGateway("bankTransfer", { iban: e.target.value })
                           }
                           className={inputClass}
                         />
@@ -1363,16 +1265,7 @@ function Settings() {
                           type="text"
                           value={payments.gateways?.bankTransfer?.bic || ""}
                           onChange={(e) =>
-                            setPayments({
-                              ...payments,
-                              gateways: {
-                                ...payments.gateways,
-                                bankTransfer: {
-                                  ...payments.gateways?.bankTransfer,
-                                  bic: e.target.value,
-                                },
-                              },
-                            })
+                            updateGateway("bankTransfer", { bic: e.target.value })
                           }
                           className={inputClass}
                         />
@@ -1384,16 +1277,7 @@ function Settings() {
                             type="text"
                             value={payments.gateways?.bankTransfer?.instructions || ""}
                             onChange={(e) =>
-                              setPayments({
-                                ...payments,
-                                gateways: {
-                                  ...payments.gateways,
-                                  bankTransfer: {
-                                    ...payments.gateways?.bankTransfer,
-                                    instructions: e.target.value,
-                                  },
-                                },
-                              })
+                              updateGateway("bankTransfer", { instructions: e.target.value })
                             }
                             className={inputClass}
                           />
@@ -1402,7 +1286,7 @@ function Settings() {
                     </div>
                   </section>
 
-                  {/* Gateway 3: Crypto Escrow */}
+                  {/* Crypto Escrow Card */}
                   <section className={cardClass}>
                     <div className="flex items-center justify-between border-b border-outline-variant/40 pb-4">
                       <div className="flex items-center gap-3">
@@ -1421,15 +1305,8 @@ function Settings() {
                         role="switch"
                         aria-checked={payments.gateways?.cryptoEscrow?.enabled}
                         onClick={() =>
-                          setPayments({
-                            ...payments,
-                            gateways: {
-                              ...payments.gateways,
-                              cryptoEscrow: {
-                                ...payments.gateways?.cryptoEscrow,
-                                enabled: !payments.gateways?.cryptoEscrow?.enabled,
-                              },
-                            },
+                          updateGateway("cryptoEscrow", {
+                            enabled: !payments.gateways?.cryptoEscrow?.enabled,
                           })
                         }
                         className={`relative h-6 w-11 rounded-full p-0.5 transition-colors cursor-pointer ${
@@ -1450,16 +1327,7 @@ function Settings() {
                           type="text"
                           value={payments.gateways?.cryptoEscrow?.network || ""}
                           onChange={(e) =>
-                            setPayments({
-                              ...payments,
-                              gateways: {
-                                ...payments.gateways,
-                                cryptoEscrow: {
-                                  ...payments.gateways?.cryptoEscrow,
-                                  network: e.target.value,
-                                },
-                              },
-                            })
+                            updateGateway("cryptoEscrow", { network: e.target.value })
                           }
                           className={inputClass}
                         />
@@ -1470,16 +1338,7 @@ function Settings() {
                           type="text"
                           value={payments.gateways?.cryptoEscrow?.walletAddress || ""}
                           onChange={(e) =>
-                            setPayments({
-                              ...payments,
-                              gateways: {
-                                ...payments.gateways,
-                                cryptoEscrow: {
-                                  ...payments.gateways?.cryptoEscrow,
-                                  walletAddress: e.target.value,
-                                },
-                              },
-                            })
+                            updateGateway("cryptoEscrow", { walletAddress: e.target.value })
                           }
                           className={inputClass}
                         />
@@ -1489,10 +1348,9 @@ function Settings() {
                 </div>
               )}
 
-              {/* ── TAB 4: Shipping & Transit ────────────────────────────────── */}
+              {/* TAB 4: Shipping & Transit */}
               {activeTab === "fulfillment" && (
                 <div className="space-y-6 animate-in fade-in">
-                  {/* Shipping Zones */}
                   <section className={cardClass}>
                     <div className="flex items-center justify-between border-b border-outline-variant/40 pb-4">
                       <div>
@@ -1529,7 +1387,7 @@ function Settings() {
                                   zone.isActive
                                     ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
                                     : "bg-surface-container-high text-on-surface-variant"
-                               }`}
+                                }`}
                               >
                                 {zone.isActive ? "Active" : "Paused"}
                               </span>
@@ -1547,14 +1405,7 @@ function Settings() {
                           <div className="flex items-center gap-3 shrink-0">
                             <button
                               type="button"
-                              onClick={() => {
-                                setFulfillment((prev) => ({
-                                  ...prev,
-                                  shippingZones: prev.shippingZones.map((z) =>
-                                    z.id === zone.id ? { ...z, isActive: !z.isActive } : z
-                                  ),
-                                }));
-                              }}
+                              onClick={() => handleToggleZone(zone.id)}
                               className="cursor-pointer text-xs font-label-mono text-on-surface-variant hover:text-primary"
                             >
                               {zone.isActive ? "Pause" : "Activate"}
@@ -1575,7 +1426,7 @@ function Settings() {
                     </div>
                   </section>
 
-                  {/* Logistics Transit Nodes */}
+                  {/* Transit Nodes */}
                   <section className={cardClass}>
                     <div className="flex items-center justify-between border-b border-outline-variant/40 pb-4">
                       <div>
@@ -1626,7 +1477,7 @@ function Settings() {
                 </div>
               )}
 
-              {/* ── TAB 5: Security & Team ───────────────────────────────────── */}
+              {/* TAB 5: Security & Team */}
               {activeTab === "security" && (
                 <div className="space-y-6 animate-in fade-in">
                   <section className={cardClass}>
@@ -1644,27 +1495,21 @@ function Settings() {
                         title="Order review alerts"
                         detail="Email staff immediately when high-value bespoke orders enter manual escrow verification."
                         enabled={securityAndAlerts.orderAlerts}
-                        onChange={(val) =>
-                          setSecurityAndAlerts({ ...securityAndAlerts, orderAlerts: val })
-                        }
+                        onChange={(val) => updateField("securityAndAlerts", "orderAlerts", val)}
                       />
 
                       <ToggleRow
                         title="Low-stock inventory alerts"
                         detail="Notify atelier inventory managers before items drop below configured safety threshold."
                         enabled={securityAndAlerts.lowStockAlerts}
-                        onChange={(val) =>
-                          setSecurityAndAlerts({ ...securityAndAlerts, lowStockAlerts: val })
-                        }
+                        onChange={(val) => updateField("securityAndAlerts", "lowStockAlerts", val)}
                       />
 
                       <ToggleRow
                         title="Require two-factor authentication (2FA)"
                         detail="Enforce cryptographic or authenticator verification for all staff accounts accessing order data."
                         enabled={securityAndAlerts.requireTwoFactor}
-                        onChange={(val) =>
-                          setSecurityAndAlerts({ ...securityAndAlerts, requireTwoFactor: val })
-                        }
+                        onChange={(val) => updateField("securityAndAlerts", "requireTwoFactor", val)}
                       />
 
                       <div className="pt-2">
@@ -1674,10 +1519,7 @@ function Settings() {
                             min="1"
                             value={securityAndAlerts.staffUsersCount}
                             onChange={(e) =>
-                              setSecurityAndAlerts({
-                                ...securityAndAlerts,
-                                staffUsersCount: e.target.value,
-                              })
+                              updateField("securityAndAlerts", "staffUsersCount", Number(e.target.value) || 1)
                             }
                             className={inputClass}
                           />
@@ -1710,7 +1552,7 @@ function Settings() {
                 </div>
               )}
 
-              {/* ── TAB 6: Analytics Targets ─────────────────────────────────── */}
+              {/* TAB 6: Analytics Targets */}
               {activeTab === "analytics" && (
                 <div className="space-y-6 animate-in fade-in">
                   <section className={cardClass}>
@@ -1736,12 +1578,7 @@ function Settings() {
                       <Field label="Default analytics timeframe">
                         <select
                           value={analyticsDefaults.defaultTimeRange}
-                          onChange={(e) =>
-                            setAnalyticsDefaults({
-                              ...analyticsDefaults,
-                              defaultTimeRange: e.target.value,
-                            })
-                          }
+                          onChange={(e) => updateField("analyticsDefaults", "defaultTimeRange", e.target.value)}
                           className={inputClass}
                         >
                           <option value="7D">Last 7 Days (7D)</option>
@@ -1755,16 +1592,8 @@ function Settings() {
                         <input
                           type="number"
                           min="0"
-                          value={analyticsDefaults.targets?.monthlyRevenueTarget || 150000}
-                          onChange={(e) =>
-                            setAnalyticsDefaults({
-                              ...analyticsDefaults,
-                              targets: {
-                                ...analyticsDefaults.targets,
-                                monthlyRevenueTarget: Number(e.target.value) || 0,
-                              },
-                            })
-                          }
+                          value={analyticsDefaults.targets?.monthlyRevenueTarget ?? ""}
+                          onChange={(e) => updateTarget("monthlyRevenueTarget", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -1773,16 +1602,8 @@ function Settings() {
                         <input
                           type="number"
                           min="0"
-                          value={analyticsDefaults.targets?.orderVolumeTarget || 1500}
-                          onChange={(e) =>
-                            setAnalyticsDefaults({
-                              ...analyticsDefaults,
-                              targets: {
-                                ...analyticsDefaults.targets,
-                                orderVolumeTarget: Number(e.target.value) || 0,
-                              },
-                            })
-                          }
+                          value={analyticsDefaults.targets?.orderVolumeTarget ?? ""}
+                          onChange={(e) => updateTarget("orderVolumeTarget", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -1791,16 +1612,8 @@ function Settings() {
                         <input
                           type="number"
                           min="0"
-                          value={analyticsDefaults.targets?.activeCustomersTarget || 4000}
-                          onChange={(e) =>
-                            setAnalyticsDefaults({
-                              ...analyticsDefaults,
-                              targets: {
-                                ...analyticsDefaults.targets,
-                                activeCustomersTarget: Number(e.target.value) || 0,
-                              },
-                            })
-                          }
+                          value={analyticsDefaults.targets?.activeCustomersTarget ?? ""}
+                          onChange={(e) => updateTarget("activeCustomersTarget", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -1809,16 +1622,8 @@ function Settings() {
                         <input
                           type="number"
                           min="0"
-                          value={analyticsDefaults.targets?.avgOrderValueTarget || 120}
-                          onChange={(e) =>
-                            setAnalyticsDefaults({
-                              ...analyticsDefaults,
-                              targets: {
-                                ...analyticsDefaults.targets,
-                                avgOrderValueTarget: Number(e.target.value) || 0,
-                              },
-                            })
-                          }
+                          value={analyticsDefaults.targets?.avgOrderValueTarget ?? ""}
+                          onChange={(e) => updateTarget("avgOrderValueTarget", e.target.value)}
                           className={inputClass}
                         />
                       </Field>
@@ -1828,7 +1633,7 @@ function Settings() {
               )}
             </div>
 
-            {/* ── Right Aside: Fulfillment Focus & Transit Network ───────── */}
+            {/* Right Aside: Fulfillment Focus & Transit Network */}
             <aside aria-label="Fulfillment details" className="space-y-6 xl:col-span-4">
               <section className={cardClass}>
                 <div className="flex items-center justify-between">
@@ -1847,17 +1652,17 @@ function Settings() {
 
                 <p className="mt-3 text-xs text-on-surface-variant leading-relaxed">
                   High-ticket bespoke watches undergo biometric identity review before valet dispatch.
-                  Currently <span className="font-semibold text-primary">{fulfillment.ordersNeedingIdentityReview} orders</span> awaiting atelier release.
+                  Currently <span className="font-semibold text-primary">{fulfillment.ordersNeedingIdentityReview || 0} orders</span> awaiting atelier release.
                 </p>
 
                 <div className="mt-5 grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={handleSave}
-                    disabled={saving}
+                    disabled={saving || !hasChanges}
                     className="cursor-pointer rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-on-primary shadow-sm hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50"
                   >
-                    {saving ? "Saving..." : "Authorize All"}
+                    {saving ? "Saving..." : hasChanges ? `Save (${changedSections.length})` : "Saved"}
                   </button>
                   <button
                     type="button"
@@ -1896,7 +1701,7 @@ function Settings() {
         </div>
       </main>
 
-      {/* ── MODAL: Reset Store Settings to Defaults ──────────────────────── */}
+      {/* MODAL: Reset Store Settings to Defaults */}
       <Modal
         isOpen={showResetModal}
         onClose={() => setShowResetModal(false)}
@@ -1926,7 +1731,7 @@ function Settings() {
         </div>
       </Modal>
 
-      {/* ── MODAL: Add Shipping Zone ─────────────────────────────────────── */}
+      {/* MODAL: Add Shipping Zone */}
       <Modal
         isOpen={showAddZoneModal}
         onClose={() => setShowAddZoneModal(false)}
@@ -2004,7 +1809,7 @@ function Settings() {
         </form>
       </Modal>
 
-      {/* ── MODAL: Add Supported Currency ────────────────────────────────── */}
+      {/* MODAL: Add Supported Currency */}
       <Modal
         isOpen={showAddCurrencyModal}
         onClose={() => setShowAddCurrencyModal(false)}
@@ -2076,7 +1881,7 @@ function Settings() {
         </form>
       </Modal>
 
-      {/* ── MODAL: Add Transit Node ──────────────────────────────────────── */}
+      {/* MODAL: Add Transit Node */}
       <Modal
         isOpen={showAddNodeModal}
         onClose={() => setShowAddNodeModal(false)}
