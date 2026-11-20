@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { getStoreAnalytics } from "../api/settings";
 import { getOrders } from "../api/orders";
 import { getAnalyticsData } from "../api/analytics";
 
