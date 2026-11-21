@@ -1,9 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../components/PageHeader";
+import { Chart } from "@tanstack/react-charts";
+import { defineChart, barY, areaY, lineY, dot, d3Curve } from "@tanstack/charts";
+import { scaleBand } from "@tanstack/charts/scales/band";
+import { scalePoint } from "@tanstack/charts/scales/point";
+import { scaleLinear } from "@tanstack/charts/scales/linear";
+import { curveMonotoneX } from "d3-shape";
 import {
   TIME_RANGES,
-  KPI_CARDS,
-  REVENUE_BARS,
+  RANGE_TELEMETRY,
   CATEGORY_SHARE,
   CONVERSION_FUNNEL,
   REGIONAL_DEMAND,
@@ -15,12 +20,23 @@ const cardClass =
 
 function Analytics() {
   const [selectedRange, setSelectedRange] = useState("7D");
-  const [kpiCards, setKpiCards] = useState(KPI_CARDS);
-  const [revenueBars, setRevenueBars] = useState(REVENUE_BARS);
+  const [kpiCards, setKpiCards] = useState(() => RANGE_TELEMETRY["7D"].kpiCards);
+  const [revenueBars, setRevenueBars] = useState(() => RANGE_TELEMETRY["7D"].revenueBars);
+  const [velocityPoints, setVelocityPoints] = useState(() => RANGE_TELEMETRY["7D"].velocityPoints);
+  const [peakNote, setPeakNote] = useState(() => RANGE_TELEMETRY["7D"].peakNote);
   const [categoryShare, setCategoryShare] = useState(CATEGORY_SHARE);
   const [conversionFunnel, setConversionFunnel] = useState(CONVERSION_FUNNEL);
   const [regionalDemand, setRegionalDemand] = useState(REGIONAL_DEMAND);
   const [loading, setLoading] = useState(false);
+
+  const handleRangeChange = (range) => {
+    setSelectedRange(range);
+    const fallback = RANGE_TELEMETRY[range] || RANGE_TELEMETRY["7D"];
+    setKpiCards(fallback.kpiCards);
+    setRevenueBars(fallback.revenueBars);
+    setVelocityPoints(fallback.velocityPoints);
+    setPeakNote(fallback.peakNote);
+  };
 
   useEffect(() => {
     let ignore = false;
@@ -35,6 +51,12 @@ function Analytics() {
           }
           if (data.revenueBars && data.revenueBars.length > 0) {
             setRevenueBars(data.revenueBars);
+          }
+          if (data.velocityData && data.velocityData.length > 0) {
+            setVelocityPoints(data.velocityData);
+          }
+          if (data.peakNote) {
+            setPeakNote(data.peakNote);
           }
           if (data.categoryShare && data.categoryShare.length > 0) {
             setCategoryShare(data.categoryShare);
@@ -58,6 +80,119 @@ function Analytics() {
       ignore = true;
     };
   }, [selectedRange]);
+
+  // TanStack Revenue Breakdown Bar Chart definition
+  const revenueChartDef = useMemo(() => {
+    const data = (revenueBars || []).map((b) => {
+      const label = b.label || b.day || "";
+      const val =
+        typeof b.revenue === "number"
+          ? b.revenue
+          : parseFloat(String(b.amount || "").replace(/[^0-9.]/g, "")) * 1000 || 0;
+      return {
+        label,
+        revenue: val,
+        amount: b.amount || `$${(val / 1000).toFixed(1)}k`,
+        orders: b.orders || 0,
+        active: Boolean(b.active),
+      };
+    });
+
+    const maxVal = Math.max(...data.map((d) => d.revenue), 1000);
+
+    return defineChart({
+      data,
+      theme: {
+        foreground: "#948da5",
+        grid: "rgba(255, 255, 255, 0.06)",
+        muted: "#767086",
+      },
+      margin: { top: 16, right: 14, bottom: 28, left: 44 },
+      scales: {
+        x: {
+          scale: scaleBand().domain(data.map((d) => d.label)),
+          grid: false,
+        },
+        y: {
+          scale: scaleLinear()
+            .domain([0, Math.ceil(maxVal * 1.15)])
+            .nice(),
+          grid: true,
+        },
+      },
+      marks: [
+        barY(data, {
+          x: (d) => d.label,
+          y: (d) => d.revenue,
+          fill: (d) => (d.active ? "#8250df" : "#6d3bd7"),
+          fillOpacity: (d) => (d.active ? 1 : 0.75),
+          radius: { end: 6 },
+          maxThickness: 38,
+        }),
+      ],
+    });
+  }, [revenueBars]);
+
+  // TanStack Order Velocity Area + Line Chart definition
+  const velocityChartDef = useMemo(() => {
+    const data = (velocityPoints || []).map((p) => ({
+      label: p.label,
+      orders: Number(p.orders) || 0,
+    }));
+
+    const maxVal = Math.max(...data.map((d) => d.orders), 10);
+    const peakItem = data.reduce(
+      (max, d) => (d.orders > max.orders ? d : max),
+      data[0] || { label: "", orders: 0 }
+    );
+    const smooth = d3Curve(curveMonotoneX);
+
+    return defineChart({
+      data,
+      theme: {
+        foreground: "#948da5",
+        grid: "rgba(255, 255, 255, 0.06)",
+        muted: "#767086",
+      },
+      margin: { top: 16, right: 16, bottom: 28, left: 36 },
+      scales: {
+        x: {
+          scale: scalePoint().domain(data.map((d) => d.label)),
+          grid: false,
+        },
+        y: {
+          scale: scaleLinear()
+            .domain([0, Math.ceil(maxVal * 1.25)])
+            .nice(),
+          grid: true,
+        },
+      },
+      marks: [
+        areaY(data, {
+          x: (d) => d.label,
+          y: (d) => d.orders,
+          fill: "#6d3bd7",
+          fillOpacity: 0.18,
+          curve: smooth,
+        }),
+        lineY(data, {
+          x: (d) => d.label,
+          y: (d) => d.orders,
+          stroke: "#6d3bd7",
+          strokeWidth: 3,
+          curve: smooth,
+        }),
+        dot([peakItem], {
+          x: (d) => d.label,
+          y: (d) => d.orders,
+          r: 5,
+          fill: "#6d3bd7",
+          stroke: "#ffffff",
+          strokeWidth: 2.5,
+        }),
+      ],
+    });
+  }, [velocityPoints]);
 
   return (
     <>
@@ -92,7 +227,7 @@ function Analytics() {
                     <button
                       key={range}
                       type="button"
-                      onClick={() => setSelectedRange(range)}
+                      onClick={() => handleRangeChange(range)}
                       className={`cursor-pointer rounded-lg px-3 py-1.5 font-label-mono text-[10px] uppercase tracking-widest transition-all ${
                         active
                           ? "bg-primary text-on-primary shadow-[0_4px_12px_rgba(109,59,215,0.22)]"
@@ -138,116 +273,103 @@ function Analytics() {
             ))}
           </section>
 
-          {/* Primary Graphs: Revenue Breakdown + Order Velocity */}
+          {/* Primary Graphs: TanStack Revenue Breakdown + TanStack Order Velocity */}
           <section className="grid grid-cols-1 gap-gutter xl:grid-cols-12">
-            <article className={`${cardClass} xl:col-span-7`}>
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-title-md text-xl font-semibold">
-                    Revenue breakdown
-                  </h3>
-                  <p className="mt-1 text-body-base text-on-surface-variant">
-                    {loading ? "Refreshing telemetry..." : "Gross revenue performance"}
-                  </p>
+            <article className={`${cardClass} flex flex-col justify-between xl:col-span-7`}>
+              <div>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-title-md text-xl font-semibold">
+                      Revenue breakdown
+                    </h3>
+                    <p className="mt-1 text-body-base text-on-surface-variant">
+                      {loading
+                        ? "Refreshing telemetry..."
+                        : `Gross revenue performance (${selectedRange})`}
+                    </p>
+                  </div>
+                  <span className="rounded-lg bg-surface-container px-3 py-1.5 font-label-mono text-[10px] uppercase tracking-widest text-primary">
+                    Cadence: {selectedRange}
+                  </span>
                 </div>
-                <span className="rounded-lg bg-surface-container px-3 py-1.5 font-label-mono text-[10px] uppercase tracking-widest text-primary">
-                  Velocity ({selectedRange})
-                </span>
+
+                {/* TanStack Bar Chart */}
+                <div className="mt-6 w-full">
+                  <Chart
+                    definition={revenueChartDef}
+                    ariaLabel="Revenue breakdown bar chart"
+                    height={230}
+                    className="w-full"
+                  />
+                </div>
               </div>
 
-              <div className="mt-8 flex h-56 items-end justify-between gap-3 border-b border-outline-variant/50 px-2">
-                {revenueBars.map((bar) => (
-                  <div
-                    key={bar.day}
-                    className="group flex h-full flex-1 flex-col justify-end gap-2"
-                  >
-                    <span
-                      className={`text-center text-xs transition-opacity ${
-                        bar.active
-                          ? "font-semibold text-primary opacity-100"
-                          : "text-on-surface-variant opacity-0 group-hover:opacity-100"
-                      }`}
-                    >
-                      {bar.amount}
-                    </span>
-                    <div
-                      style={{ height: bar.height }}
-                      className={`rounded-t-lg transition-all duration-300 group-hover:bg-primary/60 ${
-                        bar.active
-                          ? "bg-primary shadow-[0_8px_20px_rgba(109,59,215,0.25)]"
-                          : bar.shade
-                      }`}
-                    />
-                    <span
-                      className={`pb-2 text-center text-xs ${
-                        bar.active
-                          ? "font-semibold text-primary"
-                          : "text-outline"
-                      }`}
-                    >
-                      {bar.day}
-                    </span>
-                  </div>
-                ))}
+              {/* Exact revenue amounts for each segment */}
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/30 pt-3">
+                {revenueBars.map((bar) => {
+                  const label = bar.label || bar.day;
+                  return (
+                    <div key={label} className="flex flex-col items-center">
+                      <span
+                        className={`font-label-mono text-[11px] tabular-nums ${
+                          bar.active ? "font-semibold text-primary" : "text-on-surface"
+                        }`}
+                      >
+                        {bar.amount}
+                      </span>
+                      <span
+                        className={`font-label-mono text-[10px] ${
+                          bar.active ? "font-semibold text-primary" : "text-on-surface-variant"
+                        }`}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </article>
 
-            <article className={`${cardClass} xl:col-span-5`}>
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-title-md text-xl font-semibold">
-                    Order velocity
-                  </h3>
-                  <p className="mt-1 text-body-base text-on-surface-variant">
-                    Peak activity telemetry
-                  </p>
+            <article className={`${cardClass} flex flex-col justify-between xl:col-span-5`}>
+              <div>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-title-md text-xl font-semibold">
+                      Order velocity
+                    </h3>
+                    <p className="mt-1 text-body-base text-on-surface-variant">
+                      Peak activity telemetry
+                    </p>
+                  </div>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-container/70 px-2.5 py-1 font-label-mono text-[9px] uppercase tracking-widest text-primary">
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                    {peakNote}
+                  </span>
                 </div>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-container/70 px-2.5 py-1 font-label-mono text-[9px] uppercase tracking-widest text-primary">
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  Peak 18:00
-                </span>
+
+                {/* TanStack Area + Line Chart */}
+                <div className="mt-6 w-full">
+                  <Chart
+                    definition={velocityChartDef}
+                    ariaLabel="Order velocity area and line chart"
+                    height={230}
+                    className="w-full"
+                  />
+                </div>
               </div>
 
-              <div className="mt-10 rounded-2xl bg-surface-container-low p-4">
-                <svg
-                  className="h-48 w-full"
-                  viewBox="0 0 360 180"
-                  preserveAspectRatio="none"
-                  aria-label="Order velocity chart"
-                >
-                  <defs>
-                    <linearGradient id="velocityFill" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="#6d3bd7" stopOpacity=".35" />
-                      <stop offset="100%" stopColor="#6d3bd7" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <path
-                    d="M0 145 C45 120 70 140 110 112 S175 100 210 70 S275 25 360 58 L360 180 L0 180Z"
-                    fill="url(#velocityFill)"
-                  />
-                  <path
-                    d="M0 145 C45 120 70 140 110 112 S175 100 210 70 S275 25 360 58"
-                    fill="none"
-                    stroke="#6d3bd7"
-                    strokeWidth="4"
-                    strokeLinecap="round"
-                  />
-                  <circle
-                    cx="285"
-                    cy="37"
-                    r="6"
-                    fill="#6d3bd7"
-                    stroke="#fffaff"
-                    strokeWidth="3"
-                  />
-                </svg>
-                <div className="flex justify-between text-[10px] font-medium text-outline">
-                  <span>00:00</span>
-                  <span>06:00</span>
-                  <span>12:00</span>
-                  <span className="font-semibold text-primary">18:00</span>
-                  <span>23:59</span>
-                </div>
+              {/* Cadence intervals and order volume */}
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/30 pt-3 text-[10px] text-outline">
+                {velocityPoints.map((point) => (
+                  <div key={point.label} className="text-center">
+                    <span className="font-label-mono text-[11px] font-semibold text-primary tabular-nums">
+                      {point.orders}
+                    </span>
+                    <span className="block font-label-mono text-[10px] text-on-surface-variant">
+                      {point.label}
+                    </span>
+                  </div>
+                ))}
               </div>
             </article>
           </section>
