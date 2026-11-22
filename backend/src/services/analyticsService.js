@@ -192,54 +192,49 @@ export const rollupDailyAnalytics = async (dateKey) => {
  * }>}
  */
 export const fetchAnalyticsOverview = async (range = "7D") => {
-  const bounds = normalizeDateRange(range);
-  const todayKey = formatDateKey(new Date());
-
-  const includesToday =
-    bounds.endKey >= todayKey && bounds.startKey <= todayKey;
+  const bounds = normalizeDateRange("30D");
 
   // 1. Fetch pre-aggregated snapshots for past closed days
-  const pastDays = await DailyAnalytics.find({
-    dateKey: {
-      $gte: bounds.startKey,
-      ...(includesToday ? { $lt: todayKey } : { $lte: bounds.endKey }),
+  const [pastDays] = await DailyAnalytics.aggregate([
+    {
+      $match: {
+        dateKey: {
+          $lte: bounds.endKey,
+          $gte: bounds.startKey,
+        },
+      },
     },
-  })
-    .sort({ dateKey: 1 })
-    .lean();
+    {
+      $group: {
+        _id: null,
+        totalRevenue: { $sum: "$revenue" },
+        totalSales: { $sum: "$sales" },
+        totalOrders: { $sum: "$totalOrders" },
+        newCustomers: { $sum: "$newCustomers" },
+      },
+    },
+    {
+      $project: {
+        _id: 0, // Strip _id: null from the final object
+        totalRevenue: 1,
+        totalSales: 1,
+        totalOrders: 1,
+        newCustomers: 1,
+      },
+    },
+  ]);
 
-  // 2. If range includes today, compute today live so new orders appear immediately
-  const dailyBreakdown = [...pastDays];
-  if (includesToday) {
-    const todayMetrics = await aggregateDayMetrics(todayKey);
-    dailyBreakdown.push(todayMetrics);
-  }
-
-  // 3. Accumulate totals across all days in the range
-  let revenue = 0;
-  let totalOrders = 0;
-  let newCustomers = 0;
-  let sales = 0;
-
-  for (const day of dailyBreakdown) {
-    revenue += day.revenue || 0;
-    totalOrders += day.totalOrders || 0;
-    newCustomers += day.newCustomers || 0;
-    sales += day.sales || 0;
-  }
-
-  // 4. Accurately compute Average Order Value for the entire range (never sum daily AOVs)
-  const averageOrderValue = computeAverageOrderValue(revenue, totalOrders);
+  // 2. Accurately compute Average Order Value for the entire range (never sum daily AOVs)
+  const averageOrderValue = computeAverageOrderValue(pastDays.totalRevenue, pastDays.totalOrders);
 
   return {
     timeRange: bounds.range,
     startDate: bounds.startDate,
     endDate: bounds.endDate,
-    revenue,
-    totalOrders,
-    newCustomers,
+    revenue: pastDays.totalRevenue,
+    totalOrders: pastDays.totalOrders,
+    newCustomers: pastDays.newCustomers,
     averageOrderValue,
-    sales,
-    dailyBreakdown,
+    sales: pastDays.totalSales,
   };
 };
