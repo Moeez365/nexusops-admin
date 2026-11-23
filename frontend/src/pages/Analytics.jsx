@@ -50,13 +50,27 @@ function Analytics() {
             setKpiCards(data.kpiCards);
           }
           if (data.revenueBars && data.revenueBars.length > 0) {
-            setRevenueBars(data.revenueBars);
+            const isWeekly = data.revenueBars.some((b) => (b.label || b.day || "").toLowerCase().includes("week"));
+            if (selectedRange === "1M" && isWeekly) {
+              // Preserve frontend 4-day interval daily telemetry
+            } else {
+              setRevenueBars(data.revenueBars);
+            }
           }
           if (data.velocityData && data.velocityData.length > 0) {
-            setVelocityPoints(data.velocityData);
+            const isWeekly = data.velocityData.some((p) => (p.label || "").toLowerCase().includes("week"));
+            if (selectedRange === "1M" && isWeekly) {
+              // Preserve frontend 4-day interval daily telemetry
+            } else {
+              setVelocityPoints(data.velocityData);
+            }
           }
           if (data.peakNote) {
-            setPeakNote(data.peakNote);
+            if (selectedRange === "1M" && data.peakNote.toLowerCase().includes("week")) {
+              // Preserve frontend 4-day interval peak note
+            } else {
+              setPeakNote(data.peakNote);
+            }
           }
           if (data.categoryShare && data.categoryShare.length > 0) {
             setCategoryShare(data.categoryShare);
@@ -124,8 +138,7 @@ function Analytics() {
         barY(data, {
           x: (d) => d.label,
           y: (d) => d.revenue,
-          fill: (d) => (d.active ? "#8250df" : "#6d3bd7"),
-          fillOpacity: (d) => (d.active ? 1 : 0.75),
+          fill: (d) => (d.active ? "#8250df" : "rgba(109, 59, 215, 0.45)"),
           radius: { end: 6 },
           maxThickness: 38,
         }),
@@ -182,14 +195,18 @@ function Analytics() {
           strokeWidth: 3,
           curve: smooth,
         }),
-        dot([peakItem], {
-          x: (d) => d.label,
-          y: (d) => d.orders,
-          r: 5,
-          fill: "#6d3bd7",
-          stroke: "#ffffff",
-          strokeWidth: 2.5,
-        }),
+        ...(peakItem?.label
+          ? [
+              dot([peakItem], {
+                x: (d) => d.label,
+                y: (d) => d.orders,
+                r: 5,
+                fill: "#6d3bd7",
+                stroke: "#ffffff",
+                strokeWidth: 2.5,
+              }),
+            ]
+          : []),
       ],
     });
   }, [velocityPoints]);

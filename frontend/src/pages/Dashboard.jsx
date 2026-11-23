@@ -533,9 +533,7 @@ function Dashboard() {
           {/* ── Row 2: KPISummaryGrid (4 Columns) ── */}
           <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
             {analytics &&
-              (Array.isArray(analytics)
-                ? analytics
-                : Array.isArray(analytics.kpiCards)
+              (Array.isArray(analytics.kpiCards)
                 ? analytics.kpiCards
                 : [
                     {

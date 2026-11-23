@@ -27,13 +27,15 @@ describe("Analytics Range Telemetry", () => {
     assert.equal(data7D.revenueBars[data7D.revenueBars.length - 1].label, "Sun");
   });
 
-  it("configures 1M range with weekly cohorts", () => {
+  it("configures 1M range with 4-day interval daily breakdown", () => {
     const data1M = RANGE_TELEMETRY["1M"];
     assert.ok(data1M);
     assert.equal(data1M.period, "vs last month");
-    assert.equal(data1M.revenueBars.length, 4);
-    assert.equal(data1M.revenueBars[0].label, "Week 1");
-    assert.equal(data1M.revenueBars[3].label, "Week 4");
+    assert.equal(data1M.revenueBars.length, 8);
+    assert.equal(data1M.revenueBars[0].label, "Day 04");
+    assert.equal(data1M.revenueBars[data1M.revenueBars.length - 1].label, "Day 30");
+    assert.ok(data1M.revenueBars.some((b) => b.active));
+    assert.equal(data1M.velocityPoints.length, 8);
   });
 
   it("configures 1Y range with 12 monthly intervals", () => {
