@@ -187,12 +187,86 @@ export const rollupDailyAnalytics = async (dateKey) => {
  *   totalOrders: number,
  *   newCustomers: number,
  *   averageOrderValue: number,
- *   sales: number,
- *   dailyBreakdown: Array<any>
+ *   sales: number
  * }>}
  */
+
+export const fetchDailyAnalytics = async () => {
+  const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  // 1. Fetch non-cancelled orders from the last 24 hours
+  const orders = await Order.find({
+    createdAt: { $gte: last24Hours },
+    status: { $ne: "Cancelled" },
+  })
+    .select("total items createdAt")
+    .lean();
+
+  // 2. Prepare the time slots matching the frontend revenueBars format
+  const buckets = [
+    { day: "00:00", label: "00:00", revenue: 0, amount: "$0", orders: 0, active: false },
+    { day: "04:00", label: "04:00", revenue: 0, amount: "$0", orders: 0, active: false },
+    { day: "08:00", label: "08:00", revenue: 0, amount: "$0", orders: 0, active: false },
+    { day: "12:00", label: "12:00", revenue: 0, amount: "$0", orders: 0, active: false },
+    { day: "16:00", label: "16:00", revenue: 0, amount: "$0", orders: 0, active: false },
+    { day: "20:00", label: "20:00", revenue: 0, amount: "$0", orders: 0, active: false },
+    { day: "23:59", label: "23:59", revenue: 0, amount: "$0", orders: 0, active: false },
+  ];
+
+  let totalRevenue = 0;
+  let totalUnits = 0;
+
+  // 3. Add each order into the overall totals and its matching bucket
+  for (const order of orders) {
+    const orderTotal = order.total || 0;
+    const orderUnits = Array.isArray(order.items)
+      ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
+      : 0;
+
+    totalRevenue += orderTotal;
+    totalUnits += orderUnits;
+
+    const hour = new Date(order.createdAt).getUTCHours();
+    const bucketIndex = hour === 23 ? 6 : Math.floor(hour / 4);
+
+    if (buckets[bucketIndex]) {
+      buckets[bucketIndex].revenue += orderTotal;
+      buckets[bucketIndex].orders += 1;
+    }
+  }
+
+  // 4. Format amount labels and mark the highest-revenue bucket as active
+  let peakRevenue = 0;
+  let peakIndex = -1;
+
+  buckets.forEach((bucket, index) => {
+    bucket.amount =
+      bucket.revenue >= 1000
+        ? `$${(bucket.revenue / 1000).toFixed(1)}k`
+        : `$${bucket.revenue}`;
+
+    if (bucket.revenue > peakRevenue) {
+      peakRevenue = bucket.revenue;
+      peakIndex = index;
+    }
+  });
+
+  if (peakIndex !== -1) {
+    buckets[peakIndex].active = true;
+  }
+
+  return {
+    timeRange: "24H",
+    totalRevenue,
+    totalOrders: orders.length,
+    totalUnits,
+    buckets,
+  };
+};
+
+
 export const fetchAnalyticsOverview = async (range = "7D") => {
-  const bounds = normalizeDateRange("30D");
+  const bounds = normalizeDateRange(range);
 
   // 1. Fetch pre-aggregated snapshots for past closed days
   const [pastDays] = await DailyAnalytics.aggregate([
@@ -224,17 +298,27 @@ export const fetchAnalyticsOverview = async (range = "7D") => {
     },
   ]);
 
+  const orderTotals = pastDays || {
+    totalRevenue: 0,
+    totalSales: 0,
+    totalOrders: 0,
+    newCustomers: 0,
+  };
+
   // 2. Accurately compute Average Order Value for the entire range (never sum daily AOVs)
-  const averageOrderValue = computeAverageOrderValue(pastDays.totalRevenue, pastDays.totalOrders);
+  const averageOrderValue = computeAverageOrderValue(
+    orderTotals.totalRevenue,
+    orderTotals.totalOrders,
+  );
 
   return {
     timeRange: bounds.range,
     startDate: bounds.startDate,
     endDate: bounds.endDate,
-    revenue: pastDays.totalRevenue,
-    totalOrders: pastDays.totalOrders,
-    newCustomers: pastDays.newCustomers,
+    revenue: orderTotals.totalRevenue,
+    totalOrders: orderTotals.totalOrders,
+    newCustomers: orderTotals.newCustomers,
     averageOrderValue,
-    sales: pastDays.totalSales,
+    sales: orderTotals.totalSales,
   };
 };

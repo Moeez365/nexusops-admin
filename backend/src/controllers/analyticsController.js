@@ -13,7 +13,6 @@ import {
 export const getAnalyticsOverview = asyncHandler(async (req, res) => {
   const range = req.query.range || "7D";
   const data = await fetchAnalyticsOverview(range);
-  console.log(data);
   return res.status(200).json({
     success: true,
     data,
