@@ -13,11 +13,11 @@
 
 ---------
 
-## 🌟 Overview
+## Overview
 
 **NexusOps Admin** is a luxury commerce administration dashboard and enterprise operations engine. Designed for high-volume retail management, it pairs an editorial, glassmorphic UI with a clean, decoupled backend architecture.
 
-### ✨ Key Features
+### Key Features
 
 * **Executive Analytics & Telemetry**: Dual-axis composed SVG revenue and volume velocity charts, conversion funnels, regional demand tracking, and real-time KPI metrics.
 * **Order Management & Workflow**: Interactive status transition pipeline (`Pending` $\rightarrow$ `Processing` $\rightarrow$ `Shipped` $\rightarrow$ `Delivered`), optimistic updates with rollback, quick drawer inspection, and CSV/ID clipboard utilities.
@@ -28,7 +28,7 @@
 
 ---
 
-## 🏗️ Architecture & Project Structure
+## Architecture & Project Structure
 
 The codebase adheres strictly to the **Senior MERN Clean Architecture** standard:
 * **Backend**: Thin Express controllers, dedicated business logic services in `services/`, centralized async error handling, and ReDoS-safe queries.
@@ -119,7 +119,7 @@ nexusops-admin/
 
 ---
 
-## 🎨 NexaOps Design System
+## NexaOps Design System
 
 The visual design is grounded in an editorial luxury aesthetic:
 
@@ -130,7 +130,7 @@ The visual design is grounded in an editorial luxury aesthetic:
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -172,7 +172,7 @@ npm install
 
 ---
 
-## 💻 Running the Application
+## Running the Application
 
 ### Start Backend Development Server
 ```bash
@@ -191,7 +191,7 @@ npm run dev
 
 ---
 
-## 🧪 Testing & Code Quality
+## Testing & Code Quality
 
 ### Running Unit Tests
 Both backend and frontend feature automated native unit tests:
@@ -222,7 +222,7 @@ npm run build
 
 ---
 
-## 🤖 Built-In Agent Skills (`.agents/skills/`)
+## Built-In Agent Skills (`.agents/skills/`)
 
 This repository is equipped with tailored agent skills configured for autonomous pair programming:
 
