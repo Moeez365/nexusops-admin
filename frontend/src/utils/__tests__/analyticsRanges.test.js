@@ -1,6 +1,12 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { TIME_RANGES, RANGE_TELEMETRY } from "../../constants/analytics.js";
+import {
+  TIME_RANGES,
+  RANGE_TELEMETRY,
+  TODAYS_ANALYTICS_DATA,
+  ANALYTICS_PERIODS,
+  ANALYTICS_DATA_BY_PERIOD,
+} from "../../constants/analytics.js";
 
 describe("Analytics Range Telemetry", () => {
   it("exports required range options", () => {
@@ -45,6 +51,34 @@ describe("Analytics Range Telemetry", () => {
     assert.equal(data1Y.revenueBars.length, 12);
     assert.equal(data1Y.revenueBars[0].label, "Jan");
     assert.equal(data1Y.revenueBars[11].label, "Dec");
+  });
+
+  it("exports backend-shaped TODAYS_ANALYTICS_DATA with 24 hourly trend points", () => {
+    assert.ok(TODAYS_ANALYTICS_DATA);
+    assert.equal(TODAYS_ANALYTICS_DATA.kpiCards.length, 4);
+    assert.equal(TODAYS_ANALYTICS_DATA.todaysTrends.length, 24);
+    assert.equal(TODAYS_ANALYTICS_DATA.todaysTrends[0].hour, "0");
+    assert.equal(TODAYS_ANALYTICS_DATA.todaysTrends[23].hour, "23");
+    assert.equal(typeof TODAYS_ANALYTICS_DATA.todaysTrends[0].today, "number");
+    assert.equal(TODAYS_ANALYTICS_DATA.todaysTrends[23].today, null);
+    assert.equal(typeof TODAYS_ANALYTICS_DATA.todaysTrends[23].yesterday, "number");
+    assert.ok(TODAYS_ANALYTICS_DATA.orderVelocity.length >= 6);
+  });
+
+  it("exports ANALYTICS_DATA_BY_PERIOD for Today, This Month, and This Year", () => {
+    assert.deepEqual(
+      ANALYTICS_PERIODS.map((p) => p.id),
+      ["today", "this_month", "this_year"]
+    );
+    assert.equal(ANALYTICS_DATA_BY_PERIOD.today.trends.length, 24);
+    assert.equal(ANALYTICS_DATA_BY_PERIOD.this_month.trends.length, 30);
+    assert.equal(ANALYTICS_DATA_BY_PERIOD.this_year.trends.length, 12);
+
+    for (const period of ANALYTICS_PERIODS) {
+      const payload = ANALYTICS_DATA_BY_PERIOD[period.id];
+      assert.equal(payload.kpiCards.length, 4);
+      assert.ok(payload.orderVelocity.length >= 6);
+    }
   });
 });
 

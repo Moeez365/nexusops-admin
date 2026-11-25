@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "../components/PageHeader";
 import { Chart } from "@tanstack/react-charts";
-import { defineChart, barY, areaY, lineY, dot, d3Curve } from "@tanstack/charts";
-import { scaleBand } from "@tanstack/charts/scales/band";
+import { defineChart, areaY, lineY, dot, d3Curve } from "@tanstack/charts";
 import { scalePoint } from "@tanstack/charts/scales/point";
 import { scaleLinear } from "@tanstack/charts/scales/linear";
 import { curveMonotoneX } from "d3-shape";
 import {
-  TIME_RANGES,
-  RANGE_TELEMETRY,
+  ANALYTICS_PERIODS,
+  ANALYTICS_DATA_BY_PERIOD,
   CATEGORY_SHARE,
   CONVERSION_FUNNEL,
   REGIONAL_DEMAND,
@@ -18,72 +17,195 @@ import { getStoreAnalytics } from "../api/settings";
 const cardClass =
   "rounded-2xl border border-outline-variant/60 bg-surface-container/70 p-5 shadow-[0_16px_45px_rgba(50,35,75,0.10)] backdrop-blur-xl";
 
+const chartTheme = {
+  foreground: "#948da5",
+  grid: "rgba(148, 141, 165, 0.14)",
+  muted: "#767086",
+};
+
+/**
+ * Builds the dual-series comparison TanStack chart (Current vs Previous period).
+ */
+function buildTrendsChart(trends) {
+  const data = (trends || []).map((item) => ({
+    label: String(item.label ?? item.hour ?? ""),
+    current:
+      item.current === null || item.current === undefined
+        ? item.today === null || item.today === undefined
+          ? null
+          : Number(item.today)
+        : Number(item.current),
+    previous: Number(item.previous ?? item.yesterday ?? 0),
+  }));
+
+  const currentData = data.filter((d) => d.current !== null);
+  const allValues = [
+    ...data.map((d) => d.previous),
+    ...currentData.map((d) => d.current),
+    10,
+  ];
+  const maxVal = Math.max(...allValues);
+  const smooth = d3Curve(curveMonotoneX);
+
+  return defineChart({
+    data,
+    theme: chartTheme,
+    margin: { top: 18, right: 18, bottom: 28, left: 36 },
+    scales: {
+      x: {
+        scale: scalePoint().domain(data.map((d) => d.label)),
+        grid: false,
+      },
+      y: {
+        scale: scaleLinear()
+          .domain([0, Math.ceil(maxVal * 1.2)])
+          .nice(),
+        grid: true,
+      },
+    },
+    marks: [
+      lineY(data, {
+        x: (d) => d.label,
+        y: (d) => d.previous,
+        stroke: "#948da5",
+        strokeOpacity: 0.45,
+        strokeWidth: 2,
+        curve: smooth,
+      }),
+      ...(currentData.length > 0
+        ? [
+            areaY(currentData, {
+              x: (d) => d.label,
+              y: (d) => d.current,
+              fill: "#6d3bd7",
+              fillOpacity: 0.14,
+              curve: smooth,
+            }),
+            lineY(currentData, {
+              x: (d) => d.label,
+              y: (d) => d.current,
+              stroke: "#6d3bd7",
+              strokeWidth: 2.5,
+              curve: smooth,
+            }),
+            dot(currentData, {
+              x: (d) => d.label,
+              y: (d) => d.current,
+              r: data.length > 20 ? 3.5 : 4,
+              fill: "#ffffff",
+              stroke: "#6d3bd7",
+              strokeWidth: 2.5,
+            }),
+          ]
+        : []),
+    ],
+  });
+}
+
+/**
+ * Builds the Order Velocity area + line chart.
+ */
+function buildVelocityChart(velocityPoints) {
+  const data = (velocityPoints || []).map((p) => ({
+    label: p.label,
+    orders: Number(p.orders) || 0,
+  }));
+
+  const maxVal = Math.max(...data.map((d) => d.orders), 10);
+  const peakItem = data.reduce(
+    (max, d) => (d.orders > max.orders ? d : max),
+    data[0] || { label: "", orders: 0 }
+  );
+  const smooth = d3Curve(curveMonotoneX);
+
+  return defineChart({
+    data,
+    theme: chartTheme,
+    margin: { top: 16, right: 16, bottom: 28, left: 36 },
+    scales: {
+      x: {
+        scale: scalePoint().domain(data.map((d) => d.label)),
+        grid: false,
+      },
+      y: {
+        scale: scaleLinear()
+          .domain([0, Math.ceil(maxVal * 1.25)])
+          .nice(),
+        grid: true,
+      },
+    },
+    marks: [
+      areaY(data, {
+        x: (d) => d.label,
+        y: (d) => d.orders,
+        fill: "#6d3bd7",
+        fillOpacity: 0.18,
+        curve: smooth,
+      }),
+      lineY(data, {
+        x: (d) => d.label,
+        y: (d) => d.orders,
+        stroke: "#6d3bd7",
+        strokeWidth: 3,
+        curve: smooth,
+      }),
+      ...(peakItem?.label
+        ? [
+            dot([peakItem], {
+              x: (d) => d.label,
+              y: (d) => d.orders,
+              r: 5,
+              fill: "#6d3bd7",
+              stroke: "#ffffff",
+              strokeWidth: 2.5,
+            }),
+          ]
+        : []),
+    ],
+  });
+}
+
 function Analytics() {
-  const [selectedRange, setSelectedRange] = useState("7D");
-  const [kpiCards, setKpiCards] = useState(() => RANGE_TELEMETRY["7D"].kpiCards);
-  const [revenueBars, setRevenueBars] = useState(() => RANGE_TELEMETRY["7D"].revenueBars);
-  const [velocityPoints, setVelocityPoints] = useState(() => RANGE_TELEMETRY["7D"].velocityPoints);
-  const [peakNote, setPeakNote] = useState(() => RANGE_TELEMETRY["7D"].peakNote);
+  const [selectedPeriod, setSelectedPeriod] = useState("today");
+  const [periodData, setPeriodData] = useState(ANALYTICS_DATA_BY_PERIOD.today);
   const [categoryShare, setCategoryShare] = useState(CATEGORY_SHARE);
   const [conversionFunnel, setConversionFunnel] = useState(CONVERSION_FUNNEL);
   const [regionalDemand, setRegionalDemand] = useState(REGIONAL_DEMAND);
   const [loading, setLoading] = useState(false);
 
-  const handleRangeChange = (range) => {
-    setSelectedRange(range);
-    const fallback = RANGE_TELEMETRY[range] || RANGE_TELEMETRY["7D"];
-    setKpiCards(fallback.kpiCards);
-    setRevenueBars(fallback.revenueBars);
-    setVelocityPoints(fallback.velocityPoints);
-    setPeakNote(fallback.peakNote);
+  const handlePeriodChange = (periodId) => {
+    setSelectedPeriod(periodId);
+    setPeriodData(ANALYTICS_DATA_BY_PERIOD[periodId] || ANALYTICS_DATA_BY_PERIOD.today);
   };
 
   useEffect(() => {
     let ignore = false;
+
     async function loadAnalytics() {
       try {
         setLoading(true);
-        const res = await getStoreAnalytics({ range: selectedRange });
-        if (!ignore && res?.data) {
-          const data = res.data;
-          if (data.kpiCards && data.kpiCards.length > 0) {
-            setKpiCards(data.kpiCards);
-          }
-          if (data.revenueBars && data.revenueBars.length > 0) {
-            const isWeekly = data.revenueBars.some((b) => (b.label || b.day || "").toLowerCase().includes("week"));
-            if (selectedRange === "1M" && isWeekly) {
-              // Preserve frontend 4-day interval daily telemetry
-            } else {
-              setRevenueBars(data.revenueBars);
-            }
-          }
-          if (data.velocityData && data.velocityData.length > 0) {
-            const isWeekly = data.velocityData.some((p) => (p.label || "").toLowerCase().includes("week"));
-            if (selectedRange === "1M" && isWeekly) {
-              // Preserve frontend 4-day interval daily telemetry
-            } else {
-              setVelocityPoints(data.velocityData);
-            }
-          }
-          if (data.peakNote) {
-            if (selectedRange === "1M" && data.peakNote.toLowerCase().includes("week")) {
-              // Preserve frontend 4-day interval peak note
-            } else {
-              setPeakNote(data.peakNote);
-            }
-          }
-          if (data.categoryShare && data.categoryShare.length > 0) {
-            setCategoryShare(data.categoryShare);
-          }
-          if (data.conversionFunnel && data.conversionFunnel.length > 0) {
-            setConversionFunnel(data.conversionFunnel);
-          }
-          if (data.regionalDemand && data.regionalDemand.length > 0) {
-            setRegionalDemand(data.regionalDemand);
-          }
-        }
+        const res = await getStoreAnalytics({ period: selectedPeriod });
+        if (ignore || !res?.data) return;
+
+        const data = res.data;
+        const fallback = ANALYTICS_DATA_BY_PERIOD[selectedPeriod] || ANALYTICS_DATA_BY_PERIOD.today;
+
+        setPeriodData({
+          ...fallback,
+          ...(data.title ? { title: data.title } : {}),
+          ...(data.displayTimestamp ? { displayTimestamp: data.displayTimestamp } : {}),
+          ...(data.peakNote ? { peakNote: data.peakNote } : {}),
+          ...(data.kpiCards?.length ? { kpiCards: data.kpiCards } : {}),
+          ...(data.trends?.length ? { trends: data.trends } : {}),
+          ...(data.todaysTrends?.length ? { trends: data.todaysTrends } : {}),
+          ...(data.orderVelocity?.length ? { orderVelocity: data.orderVelocity } : {}),
+        });
+
+        if (data.categoryShare?.length) setCategoryShare(data.categoryShare);
+        if (data.conversionFunnel?.length) setConversionFunnel(data.conversionFunnel);
+        if (data.regionalDemand?.length) setRegionalDemand(data.regionalDemand);
       } catch (err) {
-        console.warn("Using offline analytics defaults:", err.message);
+        console.warn("Using default analytics data:", err.message);
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -93,123 +215,13 @@ function Analytics() {
     return () => {
       ignore = true;
     };
-  }, [selectedRange]);
+  }, [selectedPeriod]);
 
-  // TanStack Revenue Breakdown Bar Chart definition
-  const revenueChartDef = useMemo(() => {
-    const data = (revenueBars || []).map((b) => {
-      const label = b.label || b.day || "";
-      const val =
-        typeof b.revenue === "number"
-          ? b.revenue
-          : parseFloat(String(b.amount || "").replace(/[^0-9.]/g, "")) * 1000 || 0;
-      return {
-        label,
-        revenue: val,
-        amount: b.amount || `$${(val / 1000).toFixed(1)}k`,
-        orders: b.orders || 0,
-        active: Boolean(b.active),
-      };
-    });
-
-    const maxVal = Math.max(...data.map((d) => d.revenue), 1000);
-
-    return defineChart({
-      data,
-      theme: {
-        foreground: "#948da5",
-        grid: "rgba(255, 255, 255, 0.06)",
-        muted: "#767086",
-      },
-      margin: { top: 16, right: 14, bottom: 28, left: 44 },
-      scales: {
-        x: {
-          scale: scaleBand().domain(data.map((d) => d.label)),
-          grid: false,
-        },
-        y: {
-          scale: scaleLinear()
-            .domain([0, Math.ceil(maxVal * 1.15)])
-            .nice(),
-          grid: true,
-        },
-      },
-      marks: [
-        barY(data, {
-          x: (d) => d.label,
-          y: (d) => d.revenue,
-          fill: (d) => (d.active ? "#8250df" : "rgba(109, 59, 215, 0.45)"),
-          radius: { end: 6 },
-          maxThickness: 38,
-        }),
-      ],
-    });
-  }, [revenueBars]);
-
-  // TanStack Order Velocity Area + Line Chart definition
-  const velocityChartDef = useMemo(() => {
-    const data = (velocityPoints || []).map((p) => ({
-      label: p.label,
-      orders: Number(p.orders) || 0,
-    }));
-
-    const maxVal = Math.max(...data.map((d) => d.orders), 10);
-    const peakItem = data.reduce(
-      (max, d) => (d.orders > max.orders ? d : max),
-      data[0] || { label: "", orders: 0 }
-    );
-    const smooth = d3Curve(curveMonotoneX);
-
-    return defineChart({
-      data,
-      theme: {
-        foreground: "#948da5",
-        grid: "rgba(255, 255, 255, 0.06)",
-        muted: "#767086",
-      },
-      margin: { top: 16, right: 16, bottom: 28, left: 36 },
-      scales: {
-        x: {
-          scale: scalePoint().domain(data.map((d) => d.label)),
-          grid: false,
-        },
-        y: {
-          scale: scaleLinear()
-            .domain([0, Math.ceil(maxVal * 1.25)])
-            .nice(),
-          grid: true,
-        },
-      },
-      marks: [
-        areaY(data, {
-          x: (d) => d.label,
-          y: (d) => d.orders,
-          fill: "#6d3bd7",
-          fillOpacity: 0.18,
-          curve: smooth,
-        }),
-        lineY(data, {
-          x: (d) => d.label,
-          y: (d) => d.orders,
-          stroke: "#6d3bd7",
-          strokeWidth: 3,
-          curve: smooth,
-        }),
-        ...(peakItem?.label
-          ? [
-              dot([peakItem], {
-                x: (d) => d.label,
-                y: (d) => d.orders,
-                r: 5,
-                fill: "#6d3bd7",
-                stroke: "#ffffff",
-                strokeWidth: 2.5,
-              }),
-            ]
-          : []),
-      ],
-    });
-  }, [velocityPoints]);
+  const trendsChartDef = useMemo(() => buildTrendsChart(periodData.trends), [periodData.trends]);
+  const velocityChartDef = useMemo(
+    () => buildVelocityChart(periodData.orderVelocity),
+    [periodData.orderVelocity]
+  );
 
   return (
     <>
@@ -222,7 +234,7 @@ function Analytics() {
 
       <main className="min-h-screen bg-background pb-24 text-on-surface md:pb-6">
         <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:px-8 md:py-8">
-          {/* Header & Timeframe Selector */}
+          {/* Header & Period Switcher */}
           <section className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
               <p className="font-label-mono text-[10px] uppercase tracking-[0.2em] text-primary">
@@ -232,30 +244,28 @@ function Analytics() {
                 Revenue &amp; telemetry analytics
               </h3>
               <p className="mt-1 text-body-base text-on-surface-variant">
-                Deep-dive performance metrics, revenue velocity, and patron conversion across your NexaOps storefront.
+                Compare store performance across Today, This Month, and This Year.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center rounded-xl border border-outline-variant/60 bg-surface-container/70 p-1 backdrop-blur-xl">
-                {TIME_RANGES.map((range) => {
-                  const active = selectedRange === range;
-                  return (
-                    <button
-                      key={range}
-                      type="button"
-                      onClick={() => handleRangeChange(range)}
-                      className={`cursor-pointer rounded-lg px-3 py-1.5 font-label-mono text-[10px] uppercase tracking-widest transition-all ${
-                        active
-                          ? "bg-primary text-on-primary shadow-[0_4px_12px_rgba(109,59,215,0.22)]"
-                          : "text-on-surface-variant hover:bg-primary/5 hover:text-primary"
-                      }`}
-                    >
-                      {range}
-                    </button>
-                  );
-                })}
-              </div>
+            <div className="inline-flex flex-wrap items-center rounded-xl border border-outline-variant/60 bg-surface-container/70 p-1 backdrop-blur-xl">
+              {ANALYTICS_PERIODS.map((period) => {
+                const active = selectedPeriod === period.id;
+                return (
+                  <button
+                    key={period.id}
+                    type="button"
+                    onClick={() => handlePeriodChange(period.id)}
+                    className={`cursor-pointer rounded-lg px-3 py-1.5 font-label-mono text-[10px] uppercase tracking-widest transition-all ${
+                      active
+                        ? "bg-primary text-on-primary shadow-[0_4px_12px_rgba(109,59,215,0.22)]"
+                        : "text-on-surface-variant hover:bg-primary/5 hover:text-primary"
+                    }`}
+                  >
+                    {period.label}
+                  </button>
+                );
+              })}
             </div>
           </section>
 
@@ -264,7 +274,7 @@ function Analytics() {
             aria-label="Key analytics metrics"
             className="grid grid-cols-1 gap-gutter sm:grid-cols-2 xl:grid-cols-4"
           >
-            {kpiCards.map((item) => (
+            {periodData.kpiCards.map((item) => (
               <article key={item.label} className={cardClass}>
                 <div className="flex items-center justify-between">
                   <p className="font-label-mono text-label-mono uppercase text-on-surface-variant">
@@ -290,64 +300,57 @@ function Analytics() {
             ))}
           </section>
 
-          {/* Primary Graphs: TanStack Revenue Breakdown + TanStack Order Velocity */}
-          <section className="grid grid-cols-1 gap-gutter xl:grid-cols-12">
-            <article className={`${cardClass} flex flex-col justify-between xl:col-span-7`}>
+          {/* Primary Graph: Dual-Series Trends Comparison */}
+          <section className={cardClass}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-title-md text-xl font-semibold">
-                      Revenue breakdown
-                    </h3>
-                    <p className="mt-1 text-body-base text-on-surface-variant">
-                      {loading
-                        ? "Refreshing telemetry..."
-                        : `Gross revenue performance (${selectedRange})`}
-                    </p>
-                  </div>
-                  <span className="rounded-lg bg-surface-container px-3 py-1.5 font-label-mono text-[10px] uppercase tracking-widest text-primary">
-                    Cadence: {selectedRange}
+                <h3 className="font-title-md text-xl font-semibold">
+                  {periodData.title}
+                </h3>
+                <p className="mt-1 text-body-base text-on-surface-variant">
+                  {loading ? "Refreshing telemetry..." : periodData.displayTimestamp}
+                </p>
+              </div>
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-primary-container/70 px-3 py-1 font-label-mono text-[10px] uppercase tracking-widest text-primary">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                {periodData.badgeLabel}
+              </span>
+            </div>
+
+            <div className="mt-6 w-full">
+              <Chart
+                definition={trendsChartDef}
+                ariaLabel={`${periodData.title} comparison chart`}
+                height={280}
+                className="w-full"
+              />
+            </div>
+
+            <div className="mt-3 flex flex-col items-center justify-between gap-3 border-t border-outline-variant/30 pt-3 sm:flex-row">
+              <span className="hidden w-32 sm:block" />
+              <span className="font-label-mono text-[11px] uppercase tracking-widest text-on-surface-variant">
+                {periodData.xAxisLabel}
+              </span>
+              <div className="flex items-center gap-5">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-primary" />
+                  <span className="font-label-mono text-xs text-on-surface">
+                    {periodData.primaryLabel}
                   </span>
                 </div>
-
-                {/* TanStack Bar Chart */}
-                <div className="mt-6 w-full">
-                  <Chart
-                    definition={revenueChartDef}
-                    ariaLabel="Revenue breakdown bar chart"
-                    height={230}
-                    className="w-full"
-                  />
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-sm bg-on-surface-variant/45" />
+                  <span className="font-label-mono text-xs text-on-surface-variant">
+                    {periodData.comparisonLabel}
+                  </span>
                 </div>
               </div>
+            </div>
+          </section>
 
-              {/* Exact revenue amounts for each segment */}
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/30 pt-3">
-                {revenueBars.map((bar) => {
-                  const label = bar.label || bar.day;
-                  return (
-                    <div key={label} className="flex flex-col items-center">
-                      <span
-                        className={`font-label-mono text-[11px] tabular-nums ${
-                          bar.active ? "font-semibold text-primary" : "text-on-surface"
-                        }`}
-                      >
-                        {bar.amount}
-                      </span>
-                      <span
-                        className={`font-label-mono text-[10px] ${
-                          bar.active ? "font-semibold text-primary" : "text-on-surface-variant"
-                        }`}
-                      >
-                        {label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </article>
-
-            <article className={`${cardClass} flex flex-col justify-between xl:col-span-5`}>
+          {/* Secondary Row: Order Velocity + Revenue by Category */}
+          <section className="grid grid-cols-1 gap-gutter lg:grid-cols-12">
+            <article className={`${cardClass} flex flex-col justify-between lg:col-span-6`}>
               <div>
                 <div className="flex items-start justify-between">
                   <div>
@@ -360,11 +363,10 @@ function Analytics() {
                   </div>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-container/70 px-2.5 py-1 font-label-mono text-[9px] uppercase tracking-widest text-primary">
                     <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                    {peakNote}
+                    {periodData.peakNote}
                   </span>
                 </div>
 
-                {/* TanStack Area + Line Chart */}
                 <div className="mt-6 w-full">
                   <Chart
                     definition={velocityChartDef}
@@ -375,9 +377,8 @@ function Analytics() {
                 </div>
               </div>
 
-              {/* Cadence intervals and order volume */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/30 pt-3 text-[10px] text-outline">
-                {velocityPoints.map((point) => (
+                {periodData.orderVelocity.map((point) => (
                   <div key={point.label} className="text-center">
                     <span className="font-label-mono text-[11px] font-semibold text-primary tabular-nums">
                       {point.orders}
@@ -389,10 +390,7 @@ function Analytics() {
                 ))}
               </div>
             </article>
-          </section>
 
-          {/* Secondary Analytics Row: Category Share & Conversion Funnel */}
-          <section className="grid grid-cols-1 gap-gutter lg:grid-cols-12">
             {/* Category Performance */}
             <article className={`${cardClass} lg:col-span-6`}>
               <div className="flex items-center justify-between">
@@ -440,7 +438,10 @@ function Analytics() {
                 ))}
               </div>
             </article>
+          </section>
 
+          {/* Tertiary Row: Conversion Funnel + Regional Demand */}
+          <section className="grid grid-cols-1 gap-gutter lg:grid-cols-12">
             {/* Conversion Funnel */}
             <article className={`${cardClass} lg:col-span-6`}>
               <div className="flex items-center justify-between">
@@ -481,47 +482,47 @@ function Analytics() {
                 ))}
               </div>
             </article>
-          </section>
 
-          {/* Regional Demand Table */}
-          <section className={cardClass}>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="font-label-mono text-[10px] uppercase tracking-[0.2em] text-primary">
-                  Global Footprint
-                </p>
-                <h3 className="mt-1 font-title-md text-xl font-semibold">
-                  Regional patron demand
-                </h3>
-              </div>
-              <span className="font-label-mono text-[10px] uppercase tracking-widest text-on-surface-variant">
-                4 active luxury hubs
-              </span>
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {regionalDemand.map((hub) => (
-                <div
-                  key={hub.region}
-                  className="rounded-xl border border-outline-variant/50 bg-surface-container-low/60 p-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-label-mono text-xs font-semibold text-primary">
-                      {hub.share} share
-                    </span>
-                    <span className="text-xs font-medium text-emerald-700">
-                      {hub.trend}
-                    </span>
-                  </div>
-                  <p className="mt-3 text-xl font-semibold text-on-surface tabular-nums">
-                    {hub.value}
+            {/* Regional Demand */}
+            <article className={`${cardClass} lg:col-span-6`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-label-mono text-[10px] uppercase tracking-[0.2em] text-primary">
+                    Global Footprint
                   </p>
-                  <p className="mt-1 text-xs text-on-surface-variant">
-                    {hub.region}
-                  </p>
+                  <h3 className="mt-1 font-title-md text-xl font-semibold">
+                    Regional patron demand
+                  </h3>
                 </div>
-              ))}
-            </div>
+                <span className="font-label-mono text-[10px] uppercase tracking-widest text-on-surface-variant">
+                  4 active luxury hubs
+                </span>
+              </div>
+
+              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {regionalDemand.map((hub) => (
+                  <div
+                    key={hub.region}
+                    className="rounded-xl border border-outline-variant/50 bg-surface-container-low/60 p-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-label-mono text-xs font-semibold text-primary">
+                        {hub.share} share
+                      </span>
+                      <span className="text-xs font-medium text-emerald-700">
+                        {hub.trend}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-xl font-semibold text-on-surface tabular-nums">
+                      {hub.value}
+                    </p>
+                    <p className="mt-1 text-xs text-on-surface-variant">
+                      {hub.region}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </article>
           </section>
         </div>
       </main>
