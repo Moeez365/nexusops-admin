@@ -192,78 +192,73 @@ export const rollupDailyAnalytics = async (dateKey) => {
  */
 
 export const fetchDailyAnalytics = async () => {
-  const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const todayDate = new Date();
+  todayDate.setUTCHours(0, 0, 0, 0);
 
-  // 1. Fetch non-cancelled orders from the last 24 hours
-  const orders = await Order.find({
-    createdAt: { $gte: last24Hours },
-    status: { $ne: "Cancelled" },
-  })
-    .select("total items createdAt")
-    .lean();
+  const yesterDay = new Date(todayDate);
+  yesterDay.setUTCDate(yesterDay.getUTCDate() - 1);
 
-  // 2. Prepare the time slots matching the frontend revenueBars format
-  const buckets = [
-    { day: "00:00", label: "00:00", revenue: 0, amount: "$0", orders: 0, active: false },
-    { day: "04:00", label: "04:00", revenue: 0, amount: "$0", orders: 0, active: false },
-    { day: "08:00", label: "08:00", revenue: 0, amount: "$0", orders: 0, active: false },
-    { day: "12:00", label: "12:00", revenue: 0, amount: "$0", orders: 0, active: false },
-    { day: "16:00", label: "16:00", revenue: 0, amount: "$0", orders: 0, active: false },
-    { day: "20:00", label: "20:00", revenue: 0, amount: "$0", orders: 0, active: false },
-    { day: "23:59", label: "23:59", revenue: 0, amount: "$0", orders: 0, active: false },
-  ];
+  const [res] = await Order.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: yesterDay },
+        status: { $ne: "Cancelled" },
+      },
+    },
+    {
+      $facet: {
+        todayStats: [
+          { $match: { createdAt: { $gte: todayDate } } },
+          {
+            $group: {
+              _id: { $hour: { date: "$createdAt", timezone: "UTC" } },
+              revenue: { $sum: "$total" },
+              orders: { $sum: 1 },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ],
+        yesterdayStats: [
+          { $match: { createdAt: { $gte: yesterDay, $lt: todayDate } } },
+          {
+            $group: {
+              _id: { $hour: { date: "$createdAt", timezone: "UTC" } },
+              revenue: { $sum: "$total" },
+              orders: { $sum: 1 },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ],
+      },
+    },
+  ]);
 
-  let totalRevenue = 0;
-  let totalUnits = 0;
+  const todayMap = new Map(
+    (res?.todayStats || []).map((item) => [item._id, item]),
+  );
+  const yesterdayMap = new Map(
+    (res?.yesterdayStats || []).map((item) => [item._id, item]),
+  );
+  const currentUtcHour = new Date().getUTCHours();
+  const todaysTrends = Array.from({ length: 24 }, (_, hour) => {
+    const todayEntry = todayMap.get(hour);
+    const yesterdayEntry = yesterdayMap.get(hour);
 
-  // 3. Add each order into the overall totals and its matching bucket
-  for (const order of orders) {
-    const orderTotal = order.total || 0;
-    const orderUnits = Array.isArray(order.items)
-      ? order.items.reduce((sum, item) => sum + (item.quantity || 1), 0)
-      : 0;
-
-    totalRevenue += orderTotal;
-    totalUnits += orderUnits;
-
-    const hour = new Date(order.createdAt).getUTCHours();
-    const bucketIndex = hour === 23 ? 6 : Math.floor(hour / 4);
-
-    if (buckets[bucketIndex]) {
-      buckets[bucketIndex].revenue += orderTotal;
-      buckets[bucketIndex].orders += 1;
-    }
-  }
-
-  // 4. Format amount labels and mark the highest-revenue bucket as active
-  let peakRevenue = 0;
-  let peakIndex = -1;
-
-  buckets.forEach((bucket, index) => {
-    bucket.amount =
-      bucket.revenue >= 1000
-        ? `$${(bucket.revenue / 1000).toFixed(1)}k`
-        : `$${bucket.revenue}`;
-
-    if (bucket.revenue > peakRevenue) {
-      peakRevenue = bucket.revenue;
-      peakIndex = index;
-    }
+    return {
+      label: String(hour),
+      current: hour <= currentUtcHour ? todayEntry?.revenue || 0 : null,
+      previous: yesterdayEntry?.revenue || 0,
+      todayOrders: hour <= currentUtcHour ? todayEntry?.orders || 0 : null,
+      yesterdayOrders: yesterdayEntry?.orders || 0,
+    };
   });
-
-  if (peakIndex !== -1) {
-    buckets[peakIndex].active = true;
-  }
-
+  console.log(todayMap);
   return {
-    timeRange: "24H",
-    totalRevenue,
-    totalOrders: orders.length,
-    totalUnits,
-    buckets,
+    todayStats: res?.todayStats || [],
+    yesterdayStats: res?.yesterdayStats || [],
+    todaysTrends,
   };
 };
-
 
 export const fetchAnalyticsOverview = async (range = "7D") => {
   const bounds = normalizeDateRange(range);
