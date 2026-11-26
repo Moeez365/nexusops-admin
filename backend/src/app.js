@@ -3,6 +3,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import routes from './routes/index.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
+import { fetchAnalytics } from './services/analyticsService.js';
 
 const app = express();
 
@@ -23,5 +24,6 @@ app.use('/api', routes);
 // Centralized error handling
 app.use(notFoundHandler);
 app.use(errorHandler);
+fetchAnalytics()
 
 export default app;

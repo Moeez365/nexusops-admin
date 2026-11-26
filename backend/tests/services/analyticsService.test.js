@@ -66,6 +66,17 @@ describe("Analytics Service - Boilerplate Tests", () => {
         /Invalid dateKey format/
       );
     });
+
+    it("rejects impossible calendar dates like 2026-02-31", async () => {
+      await assert.rejects(
+        async () => aggregateDayMetrics("2026-02-31"),
+        /Invalid calendar date/
+      );
+      await assert.rejects(
+        async () => aggregateDayMetrics("2026-13-01"),
+        /Invalid calendar date/
+      );
+    });
   });
 
   describe("Express Routes Integration", () => {

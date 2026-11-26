@@ -98,41 +98,54 @@ export const computeAverageOrderValue = (revenue = 0, totalOrders = 0) => {
  */
 export const aggregateDayMetrics = async (dateKey) => {
   if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
-    throw new Error(`Invalid dateKey format "${dateKey}". Expected YYYY-MM-DD`);
+    const err = new Error(`Invalid dateKey format "${dateKey}". Expected YYYY-MM-DD`);
+    err.statusCode = 400;
+    throw err;
   }
 
   const [year, month, day] = dateKey.split("-").map(Number);
   const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-  const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
-  // 1. Aggregate revenue, orders count, and total units sold for this day
-  const [orderSummary] = await Order.aggregate([
-    {
-      $match: {
-        createdAt: { $gte: dayStart, $lte: dayEnd },
-        status: { $ne: "Cancelled" },
+  // Verify calendar validity (e.g. reject 2026-02-31 overflowing to 2026-03-03)
+  if (
+    dayStart.getUTCFullYear() !== year ||
+    dayStart.getUTCMonth() !== month - 1 ||
+    dayStart.getUTCDate() !== day
+  ) {
+    const err = new Error(`Invalid calendar date "${dateKey}"`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+
+  // Run order aggregation and new customer count in parallel
+  const [[orderSummary], newCustomers] = await Promise.all([
+    Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: dayStart, $lte: dayEnd },
+          status: { $ne: "Cancelled" },
+        },
       },
-    },
-    {
-      $group: {
-        _id: null,
-        totalRevenue: { $sum: "$total" },
-        totalOrders: { $sum: 1 },
-        totalSales: { $sum: { $sum: "$items.quantity" } },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$total" },
+          totalOrders: { $sum: 1 },
+          totalSales: { $sum: { $sum: "$items.quantity" } },
+        },
       },
-    },
+    ]),
+    User.countDocuments({
+      createdAt: { $gte: dayStart, $lte: dayEnd },
+    }),
   ]);
 
   const revenue = orderSummary?.totalRevenue || 0;
   const totalOrders = orderSummary?.totalOrders || 0;
   const sales = orderSummary?.totalSales || 0;
 
-  // 2. Count new customer accounts registered on this day
-  const newCustomers = await User.countDocuments({
-    createdAt: { $gte: dayStart, $lte: dayEnd },
-  });
-
-  // 3. Compute safe average order value
+  // Compute safe average order value
   const averageOrderValue = computeAverageOrderValue(revenue, totalOrders);
 
   return {
@@ -252,7 +265,6 @@ export const fetchDailyAnalytics = async () => {
       yesterdayOrders: yesterdayEntry?.orders || 0,
     };
   });
-  console.log(todayMap);
   return {
     todayStats: res?.todayStats || [],
     yesterdayStats: res?.yesterdayStats || [],
@@ -260,7 +272,72 @@ export const fetchDailyAnalytics = async () => {
   };
 };
 
-export const fetchAnalyticsOverview = async (range = "7D") => {
+export const fetchAnalytics = async () => {
+  const now = new Date();
+  const firstDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+  const lastMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1, 0, 0, 0, 0));
+
+  const [res] = await DailyAnalytics.aggregate([
+    {
+      $match: {
+        date: { $gte: lastMonth },
+      },
+    },
+    {
+      $facet: {
+        thisMonthStats: [
+          {
+            $match: {
+              date: { $gte: firstDate },
+            },
+          },
+          { $sort: { date: 1 } },
+          {
+            $project: {
+              _id: 0,
+              dateKey: 1,
+              date: 1,
+              revenue: 1,
+              totalOrders: 1,
+              sales: 1,
+              newCustomers: 1,
+              averageOrderValue: 1,
+            },
+          },
+        ],
+        lastMonthStats: [
+          {
+            $match: {
+              date: { $gte: lastMonth, $lt: firstDate },
+            },
+          },
+          { $sort: { date: 1 } },
+          {
+            $project: {
+              _id: 0,
+              dateKey: 1,
+              date: 1,
+              revenue: 1,
+              totalOrders: 1,
+              sales: 1,
+              newCustomers: 1,
+              averageOrderValue: 1,
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  console.log(res)
+
+  return {
+    thisMonthStats: res?.thisMonthStats || [],
+    lastMonthStats: res?.lastMonthStats || [],
+  };
+};
+
+export const fetchAnalyticsOverview = async (range = "1M") => {
   const bounds = normalizeDateRange(range);
 
   // 1. Fetch pre-aggregated snapshots for past closed days

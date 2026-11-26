@@ -28,50 +28,70 @@ export const runDailyRollupJob = async (targetDateKey) => {
 };
 
 /**
- * Backfills rollups across a date range (inclusive).
- * Useful when setting up the store for the first time or re-syncing historical data.
+ * Backfills rollups across a date range (inclusive) in UTC.
  *
  * @param {string} startDateKey - "YYYY-MM-DD"
  * @param {string} endDateKey - "YYYY-MM-DD"
  * @returns {Promise<{ processed: number, failed: number }>}
  */
 export const backfillAnalyticsRange = async (startDateKey, endDateKey) => {
+  if (!startDateKey || !endDateKey || startDateKey > endDateKey) {
+    throw new Error(`Invalid backfill range "${startDateKey}" to "${endDateKey}"`);
+  }
+
   logger.info(`[AnalyticsWorker] Starting backfill from ${startDateKey} to ${endDateKey}`);
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // TODO [YOUR PROBLEM-SOLVING PART 5]: Backfill loop
-  //
-  // Steps to solve:
-  // 1. Iterate day by day from startDateKey to endDateKey:
-  //    let current = new Date(startDateKey);
-  //    while (formatDateKey(current) <= endDateKey) { ... current.setDate(...) }
-  // 2. Call `await rollupDailyAnalytics(formatDateKey(current))` for each day
-  // 3. Keep count of processed vs failed days and return summary
-  // ──────────────────────────────────────────────────────────────────────────
+  let processed = 0;
+  let failed = 0;
+  const [y, m, d] = startDateKey.split("-").map(Number);
+  const current = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
 
-  return { processed: 0, failed: 0 };
+  while (formatDateKey(current) <= endDateKey) {
+    const key = formatDateKey(current);
+    try {
+      await rollupDailyAnalytics(key);
+      processed += 1;
+    } catch (err) {
+      failed += 1;
+      logger.error(`[AnalyticsWorker] Backfill failed for ${key}: ${err.message}`);
+    }
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  logger.info(`[AnalyticsWorker] Backfill finished. Processed: ${processed}, Failed: ${failed}`);
+  return { processed, failed };
 };
 
 /**
- * Lightweight scheduler boilerplate using Node's standard interval/timeout.
- * (Can also be used with node-cron if you install it later: `0 0 * * *` at midnight).
+ * Runs rollups for both yesterday (closed day) and today (live day),
+ * guarded against overlapping executions.
  *
  * @param {{ intervalMs?: number }} options
  * @returns {{ stop: () => void }}
  */
 export const startAnalyticsWorker = (options = {}) => {
-  // Default to running check every 6 hours, or custom interval
   const intervalMs = options.intervalMs || 6 * 60 * 60 * 1000;
+  let isRunning = false;
 
-  logger.info(`[AnalyticsWorker] Scheduler active. Checking every ${intervalMs / 1000}s`);
+  const executeCycle = async () => {
+    if (isRunning) return;
+    isRunning = true;
 
-  const timer = setInterval(async () => {
     try {
-      await runDailyRollupJob();
+      const todayKey = formatDateKey(new Date());
+      await runDailyRollupJob(); // Yesterday
+      await runDailyRollupJob(todayKey); // Today
     } catch (err) {
       logger.error(`[AnalyticsWorker] Scheduled run error: ${err.message}`);
+    } finally {
+      isRunning = false;
     }
-  }, intervalMs);
+  };
+
+  logger.info(`[AnalyticsWorker] Scheduler active. Checking every ${intervalMs / 1000}s`);
+  executeCycle();
+
+  const timer = setInterval(executeCycle, intervalMs);
 
   return {
     stop: () => {
@@ -80,4 +100,3 @@ export const startAnalyticsWorker = (options = {}) => {
     },
   };
 };
-
