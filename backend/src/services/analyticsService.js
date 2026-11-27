@@ -46,7 +46,7 @@ export const normalizeDateRange = (
 
   let days = 7;
   if (normalized === "30D" || normalized === "30 DAYS") days = 30;
-  else if (normalized === "90D" || normalized === "90 DAYS") days = 90;
+  else if (normalized === "12M" || normalized === "12 MONTHS") days = 365;
   else if (normalized === "1D" || normalized === "TODAY") days = 1;
   else if (normalized === "7D" || normalized === "7 DAYS") days = 7;
 
@@ -547,7 +547,7 @@ export const fetchRegionalDemand = async () => {
 
 export const fetchAnalyticsOverview = async (range = "1M") => {
   const bounds = normalizeDateRange(range);
-
+  
   // Run all analytics queries concurrently
   const [
     [pastDays],
