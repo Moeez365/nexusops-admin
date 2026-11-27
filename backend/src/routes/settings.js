@@ -2,8 +2,6 @@ import express from "express";
 import {
   getStoreSettings,
   updateStoreSettings,
-  getStoreAnalytics,
-  updateAnalyticsTargets,
   getPaymentConfig,
   updatePaymentConfig,
   resetDefaultSettings,
@@ -21,15 +19,6 @@ router.route("/")
   .get(getStoreSettings)
   .put(updateStoreSettings)
   .patch(updateStoreSettings);
-
-/**
- * ── Store Analytics & Benchmarks ──
- * GET  /api/settings/analytics - Live database analytics merged with configured targets
- * PUT  /api/settings/analytics - Update target benchmarks and baseline funnel
- */
-router.route("/analytics")
-  .get(getStoreAnalytics)
-  .put(updateAnalyticsTargets);
 
 /**
  * ── Payment Config & Gateways ──

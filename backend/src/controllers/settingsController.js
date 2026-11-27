@@ -2,8 +2,6 @@ import asyncHandler from "../utils/asyncHandler.js";
 import {
   fetchStoreSettings,
   updateStoreSettingsData,
-  computeStoreAnalytics,
-  updateStoreAnalyticsTargets,
   fetchPublicPaymentConfig,
   updatePaymentGatewaysConfig,
   resetStoreSettingsToDefaults,
@@ -27,27 +25,6 @@ export const updateStoreSettings = asyncHandler(async (req, res) => {
     success: true,
     message: "Store settings updated successfully",
     data: updatedSettings,
-  });
-});
-
-// Get store analytics
-export const getStoreAnalytics = asyncHandler(async (req, res) => {
-  const analyticsData = await computeStoreAnalytics(req.query.range);
-
-  return res.status(200).json({
-    success: true,
-    data: analyticsData,
-  });
-});
-
-// Update analytics baseline targets
-export const updateAnalyticsTargets = asyncHandler(async (req, res) => {
-  const updatedDefaults = await updateStoreAnalyticsTargets(req.body);
-
-  return res.status(200).json({
-    success: true,
-    message: "Analytics targets updated successfully",
-    data: updatedDefaults,
   });
 });
 
