@@ -12,7 +12,204 @@ import {
   CONVERSION_FUNNEL,
   REGIONAL_DEMAND,
 } from "../constants";
-import { getStoreAnalytics } from "../api/settings";
+import { getAnalyticsData } from "../api/analytics";
+
+const PERIOD_TO_RANGE = {
+  today: "1D",
+  this_month: "1M",
+  this_year: "1Y",
+};
+
+/**
+ * Formats percentage change between current and previous period values.
+ */
+function formatPercentDelta(current, previous) {
+  if (!previous) return current > 0 ? "+100%" : "0.0%";
+  const pct = ((current - previous) / previous) * 100;
+  const sign = pct >= 0 ? "+" : "";
+  return `${sign}${pct.toFixed(1)}%`;
+}
+
+/**
+ * Builds KPI cards with real values and computed percentage deltas.
+ */
+function buildKpiCards(fallbackCards, curr, prev) {
+  const currAvg = curr.orders > 0 ? curr.revenue / curr.orders : 0;
+  const prevAvg = prev.orders > 0 ? prev.revenue / prev.orders : 0;
+
+  return [
+    {
+      ...fallbackCards[0],
+      value: `$${Math.round(curr.revenue).toLocaleString()}`,
+      change: formatPercentDelta(curr.revenue, prev.revenue),
+    },
+    {
+      ...fallbackCards[1],
+      value: curr.orders.toLocaleString(),
+      change: formatPercentDelta(curr.orders, prev.orders),
+    },
+    {
+      ...fallbackCards[2],
+      value: curr.customers.toLocaleString(),
+      change: formatPercentDelta(curr.customers, prev.customers),
+    },
+    {
+      ...fallbackCards[3],
+      value: `$${currAvg.toFixed(2)}`,
+      change: formatPercentDelta(currAvg, prevAvg),
+    },
+  ];
+}
+
+/**
+ * Maps live GET /api/analytics overview payload into the selected period's UI state.
+ */
+function mapOverviewToPeriodData(selectedPeriod, data, fallback) {
+  if (!data) return fallback;
+
+  const liveTimestamp = data.generatedAt
+    ? new Date(data.generatedAt).toLocaleString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : fallback.displayTimestamp;
+
+  if (selectedPeriod === "today" && data.dailyAnalytics) {
+    const {
+      todayStats = [],
+      yesterdayStats = [],
+      todayCustomers = 0,
+      yesterdayCustomers = 0,
+      todaysTrends = [],
+    } = data.dailyAnalytics;
+
+    const curr = {
+      revenue: todayStats.reduce((sum, s) => sum + (s.revenue || 0), 0),
+      orders: todayStats.reduce((sum, s) => sum + (s.orders || 0), 0),
+      customers: todayCustomers,
+    };
+    const prev = {
+      revenue: yesterdayStats.reduce((sum, s) => sum + (s.revenue || 0), 0),
+      orders: yesterdayStats.reduce((sum, s) => sum + (s.orders || 0), 0),
+      customers: yesterdayCustomers,
+    };
+
+    const velocitySlots = [
+      { label: "00:00", hours: [0, 1, 2, 3] },
+      { label: "04:00", hours: [4, 5, 6, 7] },
+      { label: "08:00", hours: [8, 9, 10, 11] },
+      { label: "12:00", hours: [12, 13, 14, 15] },
+      { label: "16:00", hours: [16, 17, 18, 19] },
+      { label: "20:00", hours: [20, 21, 22] },
+      { label: "23:59", hours: [23] },
+    ];
+    const orderVelocity = velocitySlots.map((slot) => ({
+      label: slot.label,
+      orders: slot.hours.reduce((sum, h) => sum + (todaysTrends[h]?.todayOrders || 0), 0),
+    }));
+    const peakBucket = orderVelocity.reduce(
+      (max, item) => (item.orders > max.orders ? item : max),
+      orderVelocity[0]
+    );
+
+    return {
+      ...fallback,
+      displayTimestamp: liveTimestamp,
+      peakNote: peakBucket ? `Peak ${peakBucket.label} (${peakBucket.orders} orders)` : fallback.peakNote,
+      trends: todaysTrends.length ? todaysTrends : fallback.trends,
+      orderVelocity,
+      kpiCards: buildKpiCards(fallback.kpiCards, curr, prev),
+    };
+  }
+
+  if (selectedPeriod === "this_month" && data.monthlyAnalytics) {
+    const { thisMonthStats = [], lastMonthStats = [], monthlyTrends = [] } = data.monthlyAnalytics;
+
+    const curr = {
+      revenue: thisMonthStats.reduce((sum, d) => sum + (d.revenue || 0), 0),
+      orders: thisMonthStats.reduce((sum, d) => sum + (d.totalOrders || 0), 0),
+      customers: thisMonthStats.reduce((sum, d) => sum + (d.newCustomers || 0), 0),
+    };
+    const prev = {
+      revenue: lastMonthStats.reduce((sum, d) => sum + (d.revenue || 0), 0),
+      orders: lastMonthStats.reduce((sum, d) => sum + (d.totalOrders || 0), 0),
+      customers: lastMonthStats.reduce((sum, d) => sum + (d.newCustomers || 0), 0),
+    };
+
+    const dayBuckets = [
+      { label: "Day 04", min: 1, max: 4 },
+      { label: "Day 08", min: 5, max: 8 },
+      { label: "Day 12", min: 9, max: 12 },
+      { label: "Day 16", min: 13, max: 16 },
+      { label: "Day 20", min: 17, max: 20 },
+      { label: "Day 24", min: 21, max: 24 },
+      { label: "Day 28", min: 25, max: 28 },
+      { label: "Day 30", min: 29, max: 31 },
+    ];
+    const orderVelocity = dayBuckets.map((bucket) => ({
+      label: bucket.label,
+      orders: thisMonthStats
+        .filter((d) => {
+          const dayNum = new Date(d.date).getUTCDate();
+          return dayNum >= bucket.min && dayNum <= bucket.max;
+        })
+        .reduce((sum, d) => sum + (d.totalOrders || 0), 0),
+    }));
+    const peakBucket = orderVelocity.reduce(
+      (max, item) => (item.orders > max.orders ? item : max),
+      orderVelocity[0]
+    );
+
+    return {
+      ...fallback,
+      displayTimestamp: liveTimestamp,
+      peakNote: peakBucket ? `Peak ${peakBucket.label} (${peakBucket.orders} orders)` : fallback.peakNote,
+      trends: monthlyTrends.length ? monthlyTrends : fallback.trends,
+      orderVelocity,
+      kpiCards: buildKpiCards(fallback.kpiCards, curr, prev),
+    };
+  }
+
+  if (selectedPeriod === "this_year" && data.yearlyAnalytics) {
+    const {
+      thisYearStats = [],
+      lastYearStats = [],
+      thisYearCustomers = 0,
+      lastYearCustomers = 0,
+      yearlyTrends = [],
+      yearlyVelocity = [],
+    } = data.yearlyAnalytics;
+
+    const curr = {
+      revenue: thisYearStats.reduce((sum, m) => sum + (m.revenue || 0), 0),
+      orders: thisYearStats.reduce((sum, m) => sum + (m.orders || 0), 0),
+      customers: thisYearCustomers,
+    };
+    const prev = {
+      revenue: lastYearStats.reduce((sum, m) => sum + (m.revenue || 0), 0),
+      orders: lastYearStats.reduce((sum, m) => sum + (m.orders || 0), 0),
+      customers: lastYearCustomers,
+    };
+    const peakBucket = yearlyVelocity.reduce(
+      (max, item) => (item.orders > max.orders ? item : max),
+      yearlyVelocity[0]
+    );
+
+    return {
+      ...fallback,
+      displayTimestamp: liveTimestamp,
+      peakNote: peakBucket ? `Peak ${peakBucket.label} (${peakBucket.orders} orders)` : fallback.peakNote,
+      trends: yearlyTrends.length ? yearlyTrends : fallback.trends,
+      orderVelocity: yearlyVelocity.length ? yearlyVelocity : fallback.orderVelocity,
+      kpiCards: buildKpiCards(fallback.kpiCards, curr, prev),
+    };
+  }
+
+  return fallback;
+}
 
 const cardClass =
   "rounded-2xl border border-outline-variant/60 bg-surface-container/70 p-5 shadow-[0_16px_45px_rgba(50,35,75,0.10)] backdrop-blur-xl";
@@ -184,22 +381,14 @@ function Analytics() {
     async function loadAnalytics() {
       try {
         setLoading(true);
-        const res = await getStoreAnalytics({ period: selectedPeriod });
+        const range = PERIOD_TO_RANGE[selectedPeriod] || "1M";
+        const res = await getAnalyticsData({ range });
         if (ignore || !res?.data) return;
 
         const data = res.data;
         const fallback = ANALYTICS_DATA_BY_PERIOD[selectedPeriod] || ANALYTICS_DATA_BY_PERIOD.today;
 
-        setPeriodData({
-          ...fallback,
-          ...(data.title ? { title: data.title } : {}),
-          ...(data.displayTimestamp ? { displayTimestamp: data.displayTimestamp } : {}),
-          ...(data.peakNote ? { peakNote: data.peakNote } : {}),
-          ...(data.kpiCards?.length ? { kpiCards: data.kpiCards } : {}),
-          ...(data.trends?.length ? { trends: data.trends } : {}),
-          ...(data.todaysTrends?.length ? { trends: data.todaysTrends } : {}),
-          ...(data.orderVelocity?.length ? { orderVelocity: data.orderVelocity } : {}),
-        });
+        setPeriodData(mapOverviewToPeriodData(selectedPeriod, data, fallback));
 
         if (data.categoryShare?.length) setCategoryShare(data.categoryShare);
         if (data.conversionFunnel?.length) setConversionFunnel(data.conversionFunnel);
