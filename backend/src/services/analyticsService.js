@@ -211,39 +211,43 @@ export const fetchDailyAnalytics = async () => {
   const yesterDay = new Date(todayDate);
   yesterDay.setUTCDate(yesterDay.getUTCDate() - 1);
 
-  const [res] = await Order.aggregate([
-    {
-      $match: {
-        createdAt: { $gte: yesterDay },
-        status: { $ne: "Cancelled" },
+  const [[res], todayCustomers, yesterdayCustomers] = await Promise.all([
+    Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: yesterDay },
+          status: { $ne: "Cancelled" },
+        },
       },
-    },
-    {
-      $facet: {
-        todayStats: [
-          { $match: { createdAt: { $gte: todayDate } } },
-          {
-            $group: {
-              _id: { $hour: { date: "$createdAt", timezone: "UTC" } },
-              revenue: { $sum: "$total" },
-              orders: { $sum: 1 },
+      {
+        $facet: {
+          todayStats: [
+            { $match: { createdAt: { $gte: todayDate } } },
+            {
+              $group: {
+                _id: { $hour: { date: "$createdAt", timezone: "UTC" } },
+                revenue: { $sum: "$total" },
+                orders: { $sum: 1 },
+              },
             },
-          },
-          { $sort: { _id: 1 } },
-        ],
-        yesterdayStats: [
-          { $match: { createdAt: { $gte: yesterDay, $lt: todayDate } } },
-          {
-            $group: {
-              _id: { $hour: { date: "$createdAt", timezone: "UTC" } },
-              revenue: { $sum: "$total" },
-              orders: { $sum: 1 },
+            { $sort: { _id: 1 } },
+          ],
+          yesterdayStats: [
+            { $match: { createdAt: { $gte: yesterDay, $lt: todayDate } } },
+            {
+              $group: {
+                _id: { $hour: { date: "$createdAt", timezone: "UTC" } },
+                revenue: { $sum: "$total" },
+                orders: { $sum: 1 },
+              },
             },
-          },
-          { $sort: { _id: 1 } },
-        ],
+            { $sort: { _id: 1 } },
+          ],
+        },
       },
-    },
+    ]),
+    User.countDocuments({ createdAt: { $gte: todayDate } }),
+    User.countDocuments({ createdAt: { $gte: yesterDay, $lt: todayDate } }),
   ]);
 
   const todayMap = new Map(
@@ -268,6 +272,8 @@ export const fetchDailyAnalytics = async () => {
   return {
     todayStats: res?.todayStats || [],
     yesterdayStats: res?.yesterdayStats || [],
+    todayCustomers,
+    yesterdayCustomers,
     todaysTrends,
   };
 };
@@ -329,45 +335,263 @@ export const fetchAnalytics = async () => {
     },
   ]);
 
-  console.log(res)
-
   return {
     thisMonthStats: res?.thisMonthStats || [],
     lastMonthStats: res?.lastMonthStats || [],
   };
 };
 
-export const fetchAnalyticsOverview = async (range = "1M") => {
-  const bounds = normalizeDateRange(range);
+/**
+ * Builds day-by-day comparison points (1..daysInMonth) from thisMonthStats vs lastMonthStats.
+ */
+const buildMonthlyTrends = (thisMonthStats = [], lastMonthStats = []) => {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const currentDay = now.getUTCDate();
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 
-  // 1. Fetch pre-aggregated snapshots for past closed days
-  const [pastDays] = await DailyAnalytics.aggregate([
-    {
-      $match: {
-        dateKey: {
-          $lte: bounds.endKey,
-          $gte: bounds.startKey,
+  const thisMap = new Map(
+    thisMonthStats.map((item) => [new Date(item.date).getUTCDate(), item.revenue || 0]),
+  );
+  const lastMap = new Map(
+    lastMonthStats.map((item) => [new Date(item.date).getUTCDate(), item.revenue || 0]),
+  );
+
+  return Array.from({ length: daysInMonth }, (_, i) => {
+    const day = i + 1;
+    return {
+      label: String(day),
+      current: day <= currentDay ? thisMap.get(day) || 0 : null,
+      previous: lastMap.get(day) || 0,
+    };
+  });
+};
+
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * Aggregates monthly revenue and order counts for this year vs last year (Jan-Dec).
+ */
+export const fetchYearlyAnalytics = async () => {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const currentMonth = now.getUTCMonth(); // 0..11
+  const thisYearStart = new Date(Date.UTC(year, 0, 1, 0, 0, 0, 0));
+  const lastYearStart = new Date(Date.UTC(year - 1, 0, 1, 0, 0, 0, 0));
+
+  const [[res], thisYearCustomers, lastYearCustomers] = await Promise.all([
+    Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: lastYearStart },
+          status: { $ne: "Cancelled" },
         },
+      },
+      {
+        $facet: {
+          thisYearStats: [
+            { $match: { createdAt: { $gte: thisYearStart } } },
+            {
+              $group: {
+                _id: { $month: { date: "$createdAt", timezone: "UTC" } },
+                revenue: { $sum: "$total" },
+                orders: { $sum: 1 },
+              },
+            },
+            { $sort: { _id: 1 } },
+          ],
+          lastYearStats: [
+            { $match: { createdAt: { $gte: lastYearStart, $lt: thisYearStart } } },
+            {
+              $group: {
+                _id: { $month: { date: "$createdAt", timezone: "UTC" } },
+                revenue: { $sum: "$total" },
+                orders: { $sum: 1 },
+              },
+            },
+            { $sort: { _id: 1 } },
+          ],
+        },
+      },
+    ]),
+    User.countDocuments({ createdAt: { $gte: thisYearStart } }),
+    User.countDocuments({ createdAt: { $gte: lastYearStart, $lt: thisYearStart } }),
+  ]);
+
+  const thisMap = new Map((res?.thisYearStats || []).map((m) => [m._id, m]));
+  const lastMap = new Map((res?.lastYearStats || []).map((m) => [m._id, m]));
+
+  const yearlyTrends = MONTH_LABELS.map((label, idx) => {
+    const monthNum = idx + 1;
+    return {
+      label,
+      current: idx <= currentMonth ? thisMap.get(monthNum)?.revenue || 0 : null,
+      previous: lastMap.get(monthNum)?.revenue || 0,
+    };
+  });
+
+  const yearlyVelocity = MONTH_LABELS.map((label, idx) => ({
+    label,
+    orders: thisMap.get(idx + 1)?.orders || 0,
+  }));
+
+  return {
+    thisYearStats: res?.thisYearStats || [],
+    lastYearStats: res?.lastYearStats || [],
+    thisYearCustomers,
+    lastYearCustomers,
+    yearlyTrends,
+    yearlyVelocity,
+  };
+};
+
+/**
+ * Aggregates revenue and order counts by product category.
+ */
+export const fetchCategoryShare = async () => {
+  const rows = await Order.aggregate([
+    { $match: { status: { $ne: "Cancelled" } } },
+    { $unwind: "$items" },
+    {
+      $lookup: {
+        from: "products",
+        localField: "items.product",
+        foreignField: "_id",
+        as: "productDoc",
       },
     },
     {
       $group: {
-        _id: null,
-        totalRevenue: { $sum: "$revenue" },
-        totalSales: { $sum: "$sales" },
-        totalOrders: { $sum: "$totalOrders" },
-        newCustomers: { $sum: "$newCustomers" },
+        _id: {
+          $ifNull: [{ $arrayElemAt: ["$productDoc.category", 0] }, "General"],
+        },
+        rawRevenue: {
+          $sum: {
+            $multiply: [
+              { $ifNull: ["$items.price", 0] },
+              { $ifNull: ["$items.quantity", 1] },
+            ],
+          },
+        },
+        orders: { $sum: 1 },
       },
     },
+    { $sort: { rawRevenue: -1 } },
+  ]);
+
+  const totalRev = rows.reduce((sum, r) => sum + (r.rawRevenue || 0), 0);
+
+  return rows.map((r) => ({
+    name: r._id || "General",
+    revenue: `$${Math.round(r.rawRevenue || 0).toLocaleString()}`,
+    share: totalRev > 0 ? Math.round(((r.rawRevenue || 0) / totalRev) * 100) : 0,
+    orders: r.orders || 0,
+  }));
+};
+
+/**
+ * Computes store conversion & fulfillment funnel from Users and Orders.
+ */
+export const fetchConversionFunnel = async () => {
+  const [registeredPatrons, ordersPlaced, confirmedOrders, deliveredOrders] = await Promise.all([
+    User.countDocuments(),
+    Order.countDocuments({ status: { $ne: "Cancelled" } }),
+    Order.countDocuments({
+      $or: [
+        { paymentStatus: "Paid" },
+        { status: { $in: ["Processing", "Shipped", "Delivered"] } },
+      ],
+    }),
+    Order.countDocuments({ status: "Delivered" }),
+  ]);
+
+  const baseline = Math.max(registeredPatrons, ordersPlaced, 1);
+  const pct = (count) => `${((count / baseline) * 100).toFixed(1)}%`;
+
+  return [
+    { stage: "Registered Patrons", count: registeredPatrons.toLocaleString(), rate: "100%", delta: "Accounts" },
+    { stage: "Orders Placed", count: ordersPlaced.toLocaleString(), rate: pct(ordersPlaced), delta: "Active" },
+    { stage: "Paid / Processing+", count: confirmedOrders.toLocaleString(), rate: pct(confirmedOrders), delta: "Confirmed" },
+    { stage: "Delivered Orders", count: deliveredOrders.toLocaleString(), rate: pct(deliveredOrders), delta: "Fulfilled" },
+  ];
+};
+
+/**
+ * Aggregates top 4 valid shipping countries by revenue.
+ */
+export const fetchRegionalDemand = async () => {
+  const rows = await Order.aggregate([
+    { $match: { status: { $ne: "Cancelled" } } },
     {
-      $project: {
-        _id: 0, // Strip _id: null from the final object
-        totalRevenue: 1,
-        totalSales: 1,
-        totalOrders: 1,
-        newCustomers: 1,
+      $group: {
+        _id: { $trim: { input: { $ifNull: ["$shippingAddress.country", ""] } } },
+        rawRevenue: { $sum: "$total" },
+        orders: { $sum: 1 },
       },
     },
+    { $sort: { rawRevenue: -1 } },
+  ]);
+
+  // Exclude blank or numeric-only test placeholders
+  const validRows = rows.filter((r) => r._id && !/^\d+$/.test(r._id));
+  const totalRev = validRows.reduce((sum, r) => sum + (r.rawRevenue || 0), 0);
+
+  return validRows.slice(0, 4).map((r) => ({
+    region: r._id,
+    share: totalRev > 0 ? `${Math.round((r.rawRevenue / totalRev) * 100)}%` : "0%",
+    value: `$${Math.round(r.rawRevenue || 0).toLocaleString()}`,
+    trend: `${r.orders} order${r.orders === 1 ? "" : "s"}`,
+  }));
+};
+
+export const fetchAnalyticsOverview = async (range = "1M") => {
+  const bounds = normalizeDateRange(range);
+
+  // Run all analytics queries concurrently
+  const [
+    [pastDays],
+    dailyAnalytics,
+    monthlyRaw,
+    yearlyAnalytics,
+    categoryShare,
+    conversionFunnel,
+    regionalDemand,
+  ] = await Promise.all([
+    DailyAnalytics.aggregate([
+      {
+        $match: {
+          dateKey: {
+            $lte: bounds.endKey,
+            $gte: bounds.startKey,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: "$revenue" },
+          totalSales: { $sum: "$sales" },
+          totalOrders: { $sum: "$totalOrders" },
+          newCustomers: { $sum: "$newCustomers" },
+        },
+      },
+      {
+        $project: {
+          _id: 0, // Strip _id: null from the final object
+          totalRevenue: 1,
+          totalSales: 1,
+          totalOrders: 1,
+          newCustomers: 1,
+        },
+      },
+    ]),
+    fetchDailyAnalytics(),
+    fetchAnalytics(),
+    fetchYearlyAnalytics(),
+    fetchCategoryShare(),
+    fetchConversionFunnel(),
+    fetchRegionalDemand(),
   ]);
 
   const orderTotals = pastDays || {
@@ -377,13 +601,14 @@ export const fetchAnalyticsOverview = async (range = "1M") => {
     newCustomers: 0,
   };
 
-  // 2. Accurately compute Average Order Value for the entire range (never sum daily AOVs)
+  // Accurately compute Average Order Value for the entire range (never sum daily AOVs)
   const averageOrderValue = computeAverageOrderValue(
     orderTotals.totalRevenue,
     orderTotals.totalOrders,
   );
 
   return {
+    generatedAt: new Date().toISOString(),
     timeRange: bounds.range,
     startDate: bounds.startDate,
     endDate: bounds.endDate,
@@ -392,5 +617,14 @@ export const fetchAnalyticsOverview = async (range = "1M") => {
     newCustomers: orderTotals.newCustomers,
     averageOrderValue,
     sales: orderTotals.totalSales,
+    dailyAnalytics,
+    monthlyAnalytics: {
+      ...monthlyRaw,
+      monthlyTrends: buildMonthlyTrends(monthlyRaw.thisMonthStats, monthlyRaw.lastMonthStats),
+    },
+    yearlyAnalytics,
+    categoryShare,
+    conversionFunnel,
+    regionalDemand,
   };
 };
